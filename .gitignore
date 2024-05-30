@@ -1,6 +1,7 @@
 data/ecmwf_grib
 data/npy_corn_2003_2021
 data/tl_2018_us_county
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
