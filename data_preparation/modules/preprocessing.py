@@ -12,7 +12,7 @@ def resample_ecmwf(ecmwf, start_dates):
     ecmwf : pandas.DataFrame
         The ECMWF data to be resampled.
     start_dates : pandas.DataFrame
-        A dataframe containing the dates of the MODIS bins for each year.
+        A dataframe containing the dates of the 8-day bins for each year.
         
     Returns
     -------
@@ -47,17 +47,17 @@ def resample_ecmwf(ecmwf, start_dates):
     return ecmwf_resampled
 
 
-def assign_ecmwf_forecasts_to_counties(ecmwf, us_continental_counties, start_dates, adm_level_column_name):
+def assign_ecmwf_forecasts_to_counties(ecmwf, continental_counties, start_dates, adm_level_column_name):
     """ Assigns ECMWF grid cell forecasts to US counties based on the grid cell coordinates and county polygons.   
 
     Parameters
     ----------
     ecmwf : pd.DataFrame
         The ECMWF data.
-    us_continental_counties : geopandas.geoDataFrame
-        A geodataframe containing the US counties.
+    continental_counties : geopandas.geoDataFrame
+        A geodataframe containing the counties.
     start_dates : pd.DataFrame
-        A dataframe containing the dates of the MODIS bins for each year.
+        A dataframe containing the dates of the 8-day bins for each year.
     adm_level_column_name: string
         The name of the column containing the unique identifier for each county.
         
@@ -75,16 +75,16 @@ def assign_ecmwf_forecasts_to_counties(ecmwf, us_continental_counties, start_dat
     counties_with_ecmwf_data = pd.DataFrame(index=pd.MultiIndex.from_product([
         ecmwf["time"].unique(), 
         ecmwf["start_date_bin"].unique(), 
-        us_continental_counties[adm_level_column_name].unique()], names=["init_date", "start_date_bin", adm_level_column_name])).reset_index()
+        continental_counties[adm_level_column_name].unique()], names=["init_date", "start_date_bin", adm_level_column_name])).reset_index()
     counties_with_ecmwf_data = counties_with_ecmwf_data.loc[(counties_with_ecmwf_data["init_date"].dt.year == counties_with_ecmwf_data["start_date_bin"].dt.year)].reset_index(drop=True)
 
     # merge US county polygons to final dataframe and convert to geodataframe
-    counties_with_ecmwf_data = counties_with_ecmwf_data.merge(us_continental_counties[[adm_level_column_name, "geometry"]], left_on=adm_level_column_name, right_on=adm_level_column_name, how="left").set_index(["init_date", "start_date_bin", adm_level_column_name])
+    counties_with_ecmwf_data = counties_with_ecmwf_data.merge(continental_counties[[adm_level_column_name, "geometry"]], left_on=adm_level_column_name, right_on=adm_level_column_name, how="left").set_index(["init_date", "start_date_bin", adm_level_column_name])
     counties_with_ecmwf_data = gpd.GeoDataFrame(counties_with_ecmwf_data[["geometry"]], geometry="geometry").reset_index()
 
     # reproject county polygons from geographic to planar coordinates
     # https://gis.stackexchange.com/questions/466703/warning-message-when-doing-spatial-join-nearest-neighbor-on-geopandas
-    us_continental_counties_planar = us_continental_counties[[adm_level_column_name, "geometry"]].to_crs(epsg=32723)
+    us_continental_counties_planar = continental_counties[[adm_level_column_name, "geometry"]].to_crs(epsg=32723)
     # extract latitude and longitude from location column in ECWMF dataframe
     ecmwf_unique_lat_lon = ecmwf["location"].str.split(", ", expand=True).rename(columns={0: "latitude", 1: "longitude"}).drop_duplicates().reset_index(drop=True)
     # convert ECMWF lat-lon pairs to geodataframe
