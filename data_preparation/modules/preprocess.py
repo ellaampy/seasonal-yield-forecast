@@ -2,6 +2,166 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 
+day_of_year_to_time_step = {
+    1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
+    97: 12, 105: 13, 113: 14, 121: 15, 129: 16, 137: 17, 145: 18, 153: 19, 161: 20, 
+    169: 21, 177: 22, 185: 23, 193: 24, 201: 25, 209: 26, 217: 27, 225: 28, 233: 29, 
+    241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37, 305: 38, 
+    313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 361: 45
+}
+
+month_to_first_bin = {
+    1: 1, 2: 33, 3: 65, 4: 97, 5: 121, 6: 153, 7: 185, 8: 217, 9: 249, 10: 281, 
+    11: 305, 12: 337
+}
+
+month_to_last_bin = {
+    1: 25, 2: 57, 3: 89, 4: 113, 5: 145, 6: 177, 7: 209, 8: 241, 9: 273, 10: 297, 
+    11: 329, 12: 361
+}
+
+
+def set_crop_season(country, crop):
+    """
+    Sets the crop season for a given country and crop.
+
+    Parameters:
+    country (str): The country code (e.g., "BR" for Brazil, "US" for United States).
+    crop (str): The crop type (e.g., "wheat", "maize").
+
+    Returns:
+    tuple: A tuple containing the crop season start and crop season end.
+
+    Raises:
+    ValueError: If an invalid country or crop is provided.
+    """
+    match country:
+        case "BR":
+            match crop:
+                case "wheat":
+                    crop_season_start_day = 121
+                    crop_season_end_day = 329
+                case "maize":
+                    crop_season_start_day = 1
+                    crop_season_end_day = 209
+                case _:
+                    raise ValueError("Invalid crop, must be one of ['maize', 'wheat']")
+        case "US":
+            match crop:
+                case "wheat":
+                    crop_season_start_day = 33
+                    crop_season_end_day = 241
+                case "maize":
+                    crop_season_start_day = 97
+                    crop_season_end_day = 297
+                case _:
+                    raise ValueError("Invalid crop, must be one of ['maize', 'wheat']")
+        case _:
+            raise ValueError("Invalid country, must be one of ['US', 'BR']")
+
+    print(f"Running for {country} and {crop} with crop season from day of years {crop_season_start_day}-{crop_season_end_day}")
+    return (crop_season_start_day, crop_season_end_day)
+
+def pivot_predictors(predictors):
+    
+    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "time_step"]).tolist()
+    
+    predictors_pivot = predictors.dropna(subset="time_step").pivot(index=["adm_id", "harvest_year"], columns="time_step", values=value_columns).interpolate(axis=1, method='linear', limit_direction='both')
+    predictors_pivot.columns = ["_".join([str(col) for col in c]).strip() for c in predictors_pivot.columns]
+    predictors_pivot = predictors_pivot.reset_index()
+    
+    return predictors_pivot
+
+def filter_predictors_by_adm_ids(predictor_list, adm_ids):
+    """
+    Filters the predictors by the provided adm_ids.
+
+    Parameters:
+    predictor_list (list of pd.DataFrame): The predictor DataFrames.
+    adm_ids (list): The list of adm_ids to filter.
+
+    Returns:
+    list of pd.DataFrames: The list of filtered predictor DataFrames.
+    """
+    return [predictors.loc[predictors["adm_id"].isin(adm_ids)].reset_index(drop=True) for predictors in predictor_list]
+
+
+def assign_time_steps(predictors):
+    """
+    Assigns date columns to the predictors DataFrame.
+
+    Parameters:
+    predictors (pd.DataFrame): The predictors DataFrame.
+
+    Returns:
+    pd.DataFrame: The predictors DataFrame with date columns.
+    """
+    
+    return predictors.assign(time_step=predictors["date"].dt.day_of_year.map(day_of_year_to_time_step))
+
+
+def assign_date_and_year_columns(predictors):
+    """
+    Assigns date columns to the predictors DataFrame.
+
+    Parameters:
+    predictors (pd.DataFrame): The predictors DataFrame.
+
+    Returns:
+    pd.DataFrame: The predictors DataFrame with date columns.
+    """
+    predictors = predictors.assign(date=pd.to_datetime(predictors["date"], format="%Y%m%d"), harvest_year=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.year)
+    
+    return predictors
+
+
+def filter_predictors_by_crop_season(predictors, crop_season_start, crop_season_end):
+    """
+    Filters the predictors by the crop season start and end.
+
+    Parameters:
+    predictors (pd.DataFrame): The predictors DataFrame.
+    crop_season_start (int): The day of year of the first bin of the crop season start month.
+    crop_season_end (int): The day of year of the last bin of the crop season end month.
+
+    Returns:
+    pd.DataFrame: The filtered predictors DataFrame.
+    """
+    return predictors.loc[(predictors["date"].dt.day_of_year.between(crop_season_start, crop_season_end)) & (predictors["harvest_year"].between(2003, 2023))].reset_index(drop=True)
+
+def resample_to_8_day_bins(predictors, start_date, end_date):
+    """
+    Resamples the predictors to 8-day bins.
+
+    Parameters:
+    predictors (pd.DataFrame): The predictors DataFrame.
+
+    Returns:
+    pd.DataFrame: The resampled predictors DataFrame.
+    """
+    # test if predictors are already in 8-day bins
+    if (end_date - start_date + 1) > predictors["date"].dt.day_of_year.nunique():
+        return predictors
+    
+    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "day_of_year"]).tolist()
+    
+    return predictors.groupby(["adm_id", "harvest_year"]).resample("8D", on="date")[value_columns].mean().reset_index()
+
+def preprocess_temporal_data(data_list, start_date, end_date):
+    """
+    Preprocesses the temporal data by assigning date columns and filtering by the start and end dates.
+    """
+    processed_data = []
+    for df in data_list:
+        df = df.drop(columns=["crop_name"])
+        df = assign_date_and_year_columns(df)
+        df = filter_predictors_by_crop_season(df, start_date, end_date)
+        df = resample_to_8_day_bins(df, start_date, end_date)
+        df = assign_time_steps(df)
+        df = pivot_predictors(df)
+        processed_data.append(df)
+    return processed_data
+
 
 def resample_ecmwf(ecmwf, start_dates):
     """
