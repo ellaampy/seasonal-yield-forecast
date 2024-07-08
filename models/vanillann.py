@@ -22,7 +22,7 @@ class SimpleModel(nn.Module):
     def __init__(self, dropout_rate=0.3):
         super(SimpleModel, self).__init__()
         self.fc = nn.Sequential(
-            nn.Linear(104, 256),
+            nn.Linear(185, 256),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
             nn.Linear(256, 128),
