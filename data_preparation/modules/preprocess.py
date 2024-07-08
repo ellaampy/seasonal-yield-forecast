@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import geopandas as gpd
+from scipy.stats import gamma, norm
 
 day_of_year_to_time_step = {
     1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
@@ -16,12 +17,14 @@ country_crop_to_crop_season = {
         "wheat": {
             "days": (129, 329),
             "time_steps": (16, 41),
-            "month": (5, 11)
+            "month": (5, 11),
+            "test_years": [2006, 2015, 2017]
         },
         "maize": {
             "days": (1, 201),
             "time_steps": (0, 25),
-            "month": (1, 7)
+            "month": (1, 7),
+            "test_years": [2006, 2015, 2017]
         },
         "shapefile_path": "../data/shapefiles/BR/bra_admbnda_adm2_ibge_2020.shp"
     },
@@ -29,12 +32,14 @@ country_crop_to_crop_season = {
         "wheat": {
             "days": (33, 233),
             "time_steps": (4, 29),
-            "month": (2, 8)
+            "month": (2, 8),
+            "test_years": [2006, 2015, 2017]
         },
         "maize": {
             "days": (97, 297),
             "time_steps": (12, 37),
-            "month": (4, 10)
+            "month": (4, 10),
+            "test_years": [2006, 2015, 2017]
         },
         "shapefile_path": "../data/shapefiles/US/tl_2023_us_county/tl_2023_us_county.shp"
     }
@@ -59,8 +64,9 @@ def set_crop_season(country, crop):
     crop_season_in_days_of_year = country_crop_to_crop_season[country][crop]["days"]
     crop_season_in_months = country_crop_to_crop_season[country][crop]["month"]
     crop_season_in_time_steps = country_crop_to_crop_season[country][crop]["time_steps"]
+    test_years = country_crop_to_crop_season[country][crop]["test_years"]
 
-    return (shapefile_path, crop_season_in_days_of_year, crop_season_in_months, crop_season_in_time_steps)
+    return (shapefile_path, crop_season_in_days_of_year, crop_season_in_months, crop_season_in_time_steps, test_years)
 
 
 def resample_era(era):
@@ -405,3 +411,60 @@ def assign_ecmwf_forecasts_to_adm_units(ecmwf, adm_units_shapefile):
     ecmwf_assigned_to_adm_units_pivot = ecmwf_assigned_to_adm_units_pivot.assign(harvest_year=ecmwf_assigned_to_adm_units_pivot["init_date"].dt.year)
     
     return ecmwf_assigned_to_adm_units_pivot, first_time_step
+
+
+def normal_correction(obs_data, mod_data, sce_data, cdf_threshold=0.9999999):
+    obs_len, mod_len, sce_len = [len(x) for x in [obs_data, mod_data, sce_data]]
+    obs_mean, mod_mean, sce_mean = [x.mean() for x in [obs_data, mod_data, sce_data]]
+    
+    obs_norm, mod_norm, sce_norm = [
+        norm.fit(x) for x in [obs_data, mod_data, sce_data]
+    ]
+    
+    sce_norm = list(sce_norm)
+    sce_norm[1] += 1e-5
+    sce_norm = tuple(sce_norm)
+    
+    #print(*sce_norm)
+    
+    obs_cdf = norm.cdf(np.sort(obs_data), *obs_norm)
+    mod_cdf = norm.cdf(np.sort(mod_data), *mod_norm)
+    sce_cdf = norm.cdf(np.sort(sce_data), *sce_norm)
+
+    obs_cdf = np.maximum(np.minimum(obs_cdf, cdf_threshold), 1 - cdf_threshold)
+    mod_cdf = np.maximum(np.minimum(mod_cdf, cdf_threshold), 1 - cdf_threshold)
+    sce_cdf = np.maximum(np.minimum(sce_cdf, cdf_threshold), 1 - cdf_threshold)
+
+    sce_argsort = np.argsort(sce_data)
+
+    obs_cdf_intpol = np.interp(
+        np.linspace(1, obs_len, sce_len), np.linspace(1, obs_len, obs_len), obs_cdf
+    )
+    mod_cdf_intpol = np.interp(
+        np.linspace(1, mod_len, sce_len), np.linspace(1, mod_len, mod_len), mod_cdf
+    )
+    obs_cdf_shift, mod_cdf_shift, sce_cdf_shift = [
+        (x - 0.5) for x in [obs_cdf_intpol, mod_cdf_intpol, sce_cdf]
+    ]
+
+    obs_inverse, mod_inverse, sce_inverse = [
+        1.0 / (0.5 - np.abs(x)) for x in [obs_cdf_shift, mod_cdf_shift, sce_cdf_shift]
+    ]
+
+    adapted_cdf = np.sign(obs_cdf_shift) * (
+        1.0 - 1.0 / (obs_inverse * sce_inverse / mod_inverse)
+    )
+    adapted_cdf[adapted_cdf < 0] += 1.0
+    adapted_cdf = np.maximum(np.minimum(adapted_cdf, cdf_threshold), 1 - cdf_threshold)
+
+    xvals = norm.ppf(np.sort(adapted_cdf), *obs_norm) + obs_norm[-1] / mod_norm[-1] * (
+        norm.ppf(sce_cdf, *sce_norm) - norm.ppf(sce_cdf, *mod_norm)
+    )
+
+    xvals -= xvals.mean()
+    xvals += obs_mean + (sce_mean - mod_mean)
+
+    correction = np.zeros(sce_len)
+    correction[sce_argsort] = xvals
+
+    return correction
