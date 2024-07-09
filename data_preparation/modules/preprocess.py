@@ -10,6 +10,16 @@ day_of_year_to_time_step = {
     241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37, 305: 38, 
     313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 361: 45
 }
+       
+fpar_doy_to_time_step = {
+    1: 0,  11: 2,  21: 3,  32: 4,  42: 6,  52: 7,  60: 8,  61: 8,  70: 9,  71: 9,  
+    80: 10,  81: 10,  91: 12, 92: 12, 101: 13, 102: 13, 111: 14, 112: 14, 121: 16, 122: 16, 
+    131: 17, 132: 17, 141: 18, 142: 18, 152: 19, 153: 19, 162: 21, 163: 21, 172: 22, 
+    173: 22, 182: 23, 183: 23, 192: 24, 193: 24, 202: 26, 203: 26, 213: 27, 214: 27, 
+    223: 28, 224: 28, 233: 29, 234: 29, 244: 31, 245: 31, 254: 32, 255: 32, 264: 33, 
+    265: 33, 274: 35, 275: 35, 284: 36, 285: 36, 294: 37, 295: 37, 305: 38, 306: 38, 
+    315: 40, 316: 40, 325: 41, 326: 41
+}
 
 # days refers to start days fo year of first and last 8-day bin of crop season
 country_crop_to_crop_season = {
@@ -24,7 +34,7 @@ country_crop_to_crop_season = {
             "days": (1, 201),
             "time_steps": (0, 25),
             "month": (1, 7),
-            "test_years": [2006, 2015, 2017]
+            "test_years": [2006, 2015, 2017] # TODO: define test years
         },
         "shapefile_path": "../data/shapefiles/BR/bra_admbnda_adm2_ibge_2020.shp"
     },
@@ -33,29 +43,29 @@ country_crop_to_crop_season = {
             "days": (33, 233),
             "time_steps": (4, 29),
             "month": (2, 8),
-            "test_years": [2006, 2015, 2017]
+            "test_years": [2015, 2018, 2022]
         },
         "maize": {
             "days": (97, 297),
             "time_steps": (12, 37),
             "month": (4, 10),
-            "test_years": [2006, 2015, 2017]
+            "test_years": [2006, 2015, 2017] # TODO: define test years
         },
         "shapefile_path": "../data/shapefiles/US/tl_2023_us_county/tl_2023_us_county.shp"
     }
 }
 
 
-def set_crop_season(country, crop):
+def get_study_metadata(country, crop):
     """
-    Sets the crop season for a given country and crop.
+    Returns the file paths, crop season and test years for a given country and crop.
 
     Parameters:
     country (str): The country code (e.g., "BR" for Brazil, "US" for United States).
     crop (str): The crop type (e.g., "wheat", "maize").
 
     Returns:
-    tuple: A tuple containing the day of year of the crop season start and crop season end.
+    tuple: A tuple containing the shapefile path, the crop season start and end as days of year and months and test years.
 
     Raises:
     ValueError: If an invalid country or crop is provided.
@@ -63,10 +73,9 @@ def set_crop_season(country, crop):
     shapefile_path = country_crop_to_crop_season[country]["shapefile_path"]
     crop_season_in_days_of_year = country_crop_to_crop_season[country][crop]["days"]
     crop_season_in_months = country_crop_to_crop_season[country][crop]["month"]
-    crop_season_in_time_steps = country_crop_to_crop_season[country][crop]["time_steps"]
     test_years = country_crop_to_crop_season[country][crop]["test_years"]
 
-    return (shapefile_path, crop_season_in_days_of_year, crop_season_in_months, crop_season_in_time_steps, test_years)
+    return (shapefile_path, crop_season_in_days_of_year, crop_season_in_months, test_years)
 
 
 def resample_era(era):
@@ -116,7 +125,7 @@ def pivot_predictors(predictors):
     Returns:
     DataFrame: The pivoted dataframe with predictors.
     """
-    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "time_step"]).tolist()
+    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "time_step", "doy"]).tolist()
     predictors_pivot = predictors.dropna(subset="time_step").pivot(index=["adm_id", "harvest_year"], columns="time_step", values=value_columns).interpolate(axis=1, method='linear', limit_direction='both')
     predictors_pivot.columns = ["_".join([str(col) for col in c]).strip() for c in predictors_pivot.columns]
     predictors_pivot = predictors_pivot.reset_index()
@@ -137,7 +146,7 @@ def filter_predictors_by_adm_ids(predictor_list, adm_ids):
     """
     return [predictors.loc[predictors["adm_id"].isin(adm_ids)].reset_index(drop=True) for predictors in predictor_list]
 
-
+    
 def assign_time_steps(predictors):
     """
     Assigns time step columns to the predictors DataFrame.
@@ -148,25 +157,30 @@ def assign_time_steps(predictors):
     Returns:
     DataFrame: The predictors DataFrame with time step columns.
     """  
+    if set(predictors["date"].dt.day_of_year.unique().tolist()).issubset(fpar_doy_to_time_step.keys()):
+        return predictors.assign(time_step=predictors["date"].dt.day_of_year.map(fpar_doy_to_time_step).astype('Int64'))
+    
     return predictors.assign(time_step=predictors["date"].dt.day_of_year.map(day_of_year_to_time_step).astype('Int64'))
 
 
-def assign_date_and_year_columns(predictors):
+def assign_time_columns(predictors):
     """
-    Assigns date columns to the predictors DataFrame.
+    Assigns time columns to the predictors DataFrame.
 
     Parameters:
     predictors (DataFrame): The predictors DataFrame.
 
     Returns:
-    DataFrame: The predictors DataFrame with date and year columns.
+    DataFrame: The predictors DataFrame with date, day of year and year columns.
     """
-    predictors = predictors.assign(date=pd.to_datetime(predictors["date"], format="%Y%m%d"), harvest_year=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.year)
+    predictors = predictors.assign(date=pd.to_datetime(predictors["date"], format="%Y%m%d"), 
+                                   harvest_year=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.year,
+                                   doy=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.day_of_year)
     
     return predictors
 
 
-def filter_predictors_by_crop_season(predictors, crop_season_start, crop_season_end):
+def filter_predictors_by_crop_season(predictors, crop_season_in_days_of_year):
     """
     Filters the predictors by the crop season start and end.
 
@@ -178,35 +192,41 @@ def filter_predictors_by_crop_season(predictors, crop_season_start, crop_season_
     Returns:
     DataFrame: The filtered predictors DataFrame.
     """
-    return predictors.loc[(predictors["date"].dt.day_of_year.between(crop_season_start, crop_season_end)) & (predictors["harvest_year"].between(2003, 2023))].reset_index(drop=True)
+    crop_season_start = crop_season_in_days_of_year[0]
+    crop_season_end = crop_season_in_days_of_year[1]
+    
+    return predictors.loc[(predictors["doy"].between(crop_season_start, crop_season_end)) & (predictors["harvest_year"].between(2003, 2022))].reset_index(drop=True)
 
 
-def resample_to_8_day_bins(predictors, start_date, end_date):
+def temporal_aggregation(predictors, crop_season_in_days_of_year):
     """
     Resamples the predictors to 8-day bins.
 
     Parameters:
     predictors (DataFrame): The predictors DataFrame.
+    crop_season_in_days_of_year (tuple): The start and end of the crop season as day of year.
 
     Returns:
     DataFrame: The resampled predictors DataFrame.
     """
-    # test if predictors are already in 8-day bins
+    start_date = crop_season_in_days_of_year[0]
+    end_date = crop_season_in_days_of_year[1]
+    
+    # test if predictors are already in 8- (ndvi) or 10- (fpar) day bins
     if (end_date - start_date + 1) > predictors["date"].dt.day_of_year.nunique():
         return predictors
-    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "day_of_year"]).tolist()
+    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "doy"]).tolist()
     
     return predictors.groupby(["adm_id", "harvest_year"]).resample("8D", on="date")[value_columns].mean().reset_index()
 
 
-def preprocess_temporal_data(data_list, start_date, end_date):
+def preprocess_temporal_data(data_list, crop_season_in_days_of_year):
     """
     Preprocesses the temporal predictor datasets.
     
     Parameters:
     data_list (list): A list of pandas DataFrames containing the temporal predictor datasets.
-    start_date (str): The start date for filtering the data.
-    end_date (str): The end date for filtering the data.
+    crop_season_in_days_of_year (tuple): Crop season in days of year
     
     Returns:
     list: A list of preprocessed pandas DataFrames.
@@ -214,30 +234,14 @@ def preprocess_temporal_data(data_list, start_date, end_date):
     processed_data = []
     for df in data_list:
         df = df.drop(columns=["crop_name"])
-        df = assign_date_and_year_columns(df)
-        df = filter_predictors_by_crop_season(df, start_date, end_date)
-        df = resample_to_8_day_bins(df, start_date, end_date)
+        df = assign_time_columns(df)
+        df = filter_predictors_by_crop_season(df, crop_season_in_days_of_year)
+        df = temporal_aggregation(df, crop_season_in_days_of_year)
         df = assign_time_steps(df)
         df = pivot_predictors(df)
         processed_data.append(df)
         
     return processed_data
-
-
-def filter_by_crop_season(ecmwf, crop_season_in_days_of_year):
-    """
-    Filters the ECMWF dataframe by the crop season.
-    
-    Parameters:
-    ecmwf (pd.DataFrame): ECMWF dataframe
-    crop_season_in_days_of_year (tuple): Crop season in days of year
-    
-    Returns:
-    ecmwf_crop_season (pd.DataFrame): ECMWF dataframe filtered by the crop season
-    """
-    ecmwf_crop_season = ecmwf.loc[ecmwf["doy"].between(crop_season_in_days_of_year[0], crop_season_in_days_of_year[1]+7)].reset_index(drop=True)
-    
-    return ecmwf_crop_season
 
 
 def format_ecmwf_columns(ecmwf):
@@ -252,7 +256,7 @@ def format_ecmwf_columns(ecmwf):
     """
     ecmwf = ecmwf.rename(columns={"t2m":"tavg", "tp":"prec", "mx2t24":"tmax", "mn2t24":"tmin", "time":"init_date"}).drop(columns=["surface", "step"])
     ecmwf = ecmwf.assign(valid_time=pd.to_datetime(ecmwf["valid_time"]), init_date=pd.to_datetime(ecmwf["init_date"]), 
-                        doy=pd.to_datetime(ecmwf["valid_time"]).dt.day_of_year, year=pd.to_datetime(ecmwf["init_date"]).dt.year,
+                        doy=pd.to_datetime(ecmwf["valid_time"]).dt.day_of_year, harvest_year=pd.to_datetime(ecmwf["init_date"]).dt.year,
                         location=ecmwf["latitude"].astype(int).astype(str) + ", " + ecmwf["longitude"].astype(int).astype(str),
                         tavg=ecmwf["tavg"] - 273.15, tmax=ecmwf["tmax"] - 273.15, tmin=ecmwf["tmin"] - 273.15,
                         prec=ecmwf.groupby(["init_date", "latitude", "longitude"])["prec"].transform(lambda x: x.diff().fillna(x).clip(lower=0) * 1000))
@@ -273,11 +277,11 @@ def resample_ecmwf(ecmwf, crop_season_in_doy):
     """
     start_doy, end_doy = calculate_start_and_end_doy(ecmwf, crop_season_in_doy)
     li = []
-    for year in ecmwf["year"].unique():
-        ecmwf_year = ecmwf[(ecmwf["year"] == year) & (ecmwf["valid_time"].dt.year == year)
+    for year in ecmwf["harvest_year"].unique():
+        ecmwf_year = ecmwf[(ecmwf["harvest_year"] == year) & (ecmwf["valid_time"].dt.year == year)
                            & (ecmwf["doy"].between(start_doy, end_doy+7))].reset_index(drop=True)
         ecmwf_year_resampled = (ecmwf_year
-                                .groupby(["init_date", "year", "location"])
+                                .groupby(["init_date", "harvest_year", "location"])
                                 .resample("8D", on="valid_time")[["tavg", "tmax", "tmin", "prec"]].mean().reset_index()
                                 .rename(columns={"valid_time":"start_date_bin"})
                                 )
@@ -310,7 +314,7 @@ def calculate_start_and_end_doy(ecmwf, crop_season_in_days_of_year):
     start_doy (int): Bin start as day of year
     end_doy (int): Bin end as day of year
     """
-    first_doy_available_in_all_years = ecmwf.loc[(ecmwf["year"] == ecmwf["valid_time"].dt.year)].groupby("year")["doy"].min().max()
+    first_doy_available_in_all_years = ecmwf.loc[(ecmwf["harvest_year"] == ecmwf["valid_time"].dt.year)].groupby("harvest_year")["doy"].min().max()
     start_doy = np.intersect1d(list(range(first_doy_available_in_all_years, ecmwf.doy.unique().max())), list(range(crop_season_in_days_of_year[0], crop_season_in_days_of_year[1]+1, 8))).min()
     end_doy = crop_season_in_days_of_year[1]
     
