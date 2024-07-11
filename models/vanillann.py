@@ -19,10 +19,10 @@ class YieldDataset(Dataset):
 
 
 class SimpleModel(nn.Module):
-    def __init__(self, dropout_rate=0.3):
+    def __init__(self, dropout_rate=0.3, input_size=26):
         super(SimpleModel, self).__init__()
         self.fc = nn.Sequential(
-            nn.Linear(185, 256),
+            nn.Linear(26, 256),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
             nn.Linear(256, 128),
