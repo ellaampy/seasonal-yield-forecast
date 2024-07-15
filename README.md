@@ -15,8 +15,12 @@ From Nóia Junior et al. (1) - The occurrence of adverse climatic events between
  - **2015**: Yield losses in Santa Catarina and in some parts of Rio Grande do Sul and Paraná. El Nino caused excessive rainfall in the region, increasing the relative humidity. The high relative humidity caused foliar diseases and the sudden high demand in fungicide applications caused production costs to rise by 70% (4).
  - **2017**: The national yield dropped by 36% compared to previous year because of drought and frost conditions during critical development stages of the crop. The drought occurred in June, July, September and October and its effects were magnified by extremely high temperatures (5, 6, 7). 
 
+### Crop calendar
+
+![](data_preparation/season_wheat_BR.png)
+
 ### Study region
-Around 90% of Brazilian wheat is produced in the three southern states **Paraná, Santa Catarina, and Rio Grande do Sul** (7).
+Around 90% of Brazilian wheat is produced in the three southern states **Paraná, Santa Catarina, and Rio Grande do Sul** (blue edgecolor in figure above) (7). Our analysis will focus on these three states only, given that they also share a similar cropping season with roughly the same planting and harvest dates and season length. Planting occurs 
 
 **1.2 USA**
 
