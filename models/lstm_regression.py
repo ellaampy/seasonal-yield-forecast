@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-    
 class SequentialYieldPredictors(Dataset):
     def __init__(self, data, targets=None):
         self.data = torch.tensor(data, dtype=torch.float32)
