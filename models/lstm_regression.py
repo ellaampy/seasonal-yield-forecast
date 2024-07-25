@@ -36,13 +36,22 @@ class CombinedDataset(Dataset):
     
     
 class LSTMRegression(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_layers, output_dim):
-        super(LSTMRegression, self).__init__()
+    def __init__(self, input_dim, hidden_dim, num_layers, dense_size, output_dim):
+        super().__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
 
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, output_dim)
+        self.fc = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim, dense_size),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(dense_size, dense_size),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(dense_size, 1)
+        )
 
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).requires_grad_()
@@ -54,7 +63,8 @@ class LSTMRegression(nn.Module):
 
 
 class CombinedModel(nn.Module):
-    def __init__(self, seq_input_size, static_input_size, hidden_size, lstm_layers, dense_size, output_size):
+    def __init__(self, seq_input_size, static_input_size, static_layer_1, static_layer_2, hidden_size, lstm_layers, 
+                 dropout, dense_size_1, dense_size_2, output_size):
         super(CombinedModel, self).__init__()
         self.lstm_layers = lstm_layers
         self.hidden_size = hidden_size
@@ -63,20 +73,23 @@ class CombinedModel(nn.Module):
         
         # Feedforward network for static data
         self.static_fc = nn.Sequential(
-            nn.Linear(static_input_size, dense_size),
+            nn.Linear(static_input_size, static_layer_1),
             nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(dense_size, dense_size),
+            nn.Dropout(dropout),
+            nn.Linear(static_layer_1, static_layer_2),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(dropout),
         )
         
         # Combined dense layer
         self.fc = nn.Sequential(
-            nn.Linear(hidden_size + dense_size, dense_size),
+            nn.Linear(hidden_size + static_layer_2, dense_size_1),
             nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(dense_size, output_size)
+            nn.Dropout(dropout),
+            nn.Linear(dense_size_1, dense_size_2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dense_size_2, output_size)
         )
     
     def forward(self, x_seq, x_static):

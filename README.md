@@ -28,9 +28,13 @@ Around 90% of Brazilian wheat is produced in the three southern states **Paraná
 
 From (9), we identify **2015, 2018 and 2022** as the years with extreme low yields and define them as test years. Wheat production in each of these years was affected by droughts during vegetative stage associated with El Nino/ La Nina or near El Nino/ La Nina conditions (10-13).
 
+### Crop calendar
+
+![](data_preparation/season_wheat_US.png)
+
 ### Study region
 
-For the USA, the Great Plains, inlcuding South Dakota, Nebraska, Colorado, Kansas, Oklahoma and Texas is the heartland of winter wheat production (14). But the Great Plains alone only makes up around 50% of total US wheat production from 2002-2022. Since, wheat cultivation is not as concentrated as in Brazil (see above), we decide to keep all states in our study region.
+For the USA, the Great Plains, inlcuding South Dakota, Nebraska, Colorado, Kansas, Oklahoma and Texas is the heartland of winter wheat production (14). 
 
 
 **References**
