@@ -44,10 +44,10 @@ class YieldDataset(Dataset):
         # ====================== FEATURE SELECTION START ==============================
         
         self.combined_features = []
-        seq_feature_prefixes = ["ssm", "rsm", "cwb", "et0", "rad", "ndvi"]
-        static_features = [
-            "harvest_year", "awc", "bulk_density", "drainage_class_2", "drainage_class_3", 
-            "drainage_class_4", "drainage_class_5", "drainage_class_6"]
+        seq_feature_prefixes = ["tavg", "prec", 'tmax', 'tmin', "fpar", \
+                                "ndvi", "ssm", "rsm", "cwb", "et0", "rad"]
+        static_features = ["harvest_year", "awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(1,7)]
+
         
         for feature in feature_selector:
             if feature in seq_feature_prefixes:
