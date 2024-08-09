@@ -113,13 +113,13 @@ def main(cfg: DictConfig):
         # print('Validation . . . ')
         model.eval()
         val_metrics = evaluation(model, criterion, val_loader, device=device, mode='val')
-        # print('Loss {:.4f},  RMSE {:.4f}, R2 {:.4f}'.format(val_metrics['val_loss'], 
-        #                                                     val_metrics['val_rmse'], 
-        #                                                     val_metrics['val_R2']))
+        print('Loss {:.4f},  NRMSE {:.4f}, R2 {:.4f}'.format(val_metrics['val_loss'], 
+                                                            val_metrics['val_nrmse'], 
+                                                            val_metrics['val_R2']))
 
         # Log validation metrics to TensorBoard
         writer.add_scalar('Loss/val', val_metrics['val_loss'], epoch)
-        writer.add_scalar('RMSE/val', val_metrics['val_rmse'], epoch)
+        writer.add_scalar('NRMSE/val', val_metrics['val_nrmse'], epoch)
         writer.add_scalar('R2/val', val_metrics['val_R2'], epoch)
 
         trainlog[epoch] = {**train_metrics, **val_metrics}
@@ -127,9 +127,9 @@ def main(cfg: DictConfig):
         
 
         # Early stopping
-        if val_metrics['val_rmse'] < best_RMSE:
+        if val_metrics['val_nrmse'] < best_RMSE:
             best_epoch = epoch
-            best_RMSE = val_metrics['val_rmse']
+            best_RMSE = val_metrics['val_nrmse']
             epochs_no_improve = 0  # Reset the counter if validation loss improves
             torch.save({'best epoch': best_epoch, 'state_dict': model.state_dict(),
                         'optimizer': optimizer.state_dict()},
@@ -149,15 +149,15 @@ def main(cfg: DictConfig):
     model.eval()
     test_metrics, y_true, y_pred = evaluation(model, criterion, test_loader, device=device, mode='test')
     print('========== Test Metrics ===========')
-    print('Loss {:.4f},  RMSE {:.4f}, R2 {:.4f}'.format(test_metrics['test_loss'], 
-                                                        test_metrics['test_rmse'], 
+    print('Loss {:.4f},  NRMSE {:.4f}, R2 {:.4f}'.format(test_metrics['test_loss'], 
+                                                        test_metrics['test_nrmse'], 
                                                         test_metrics['test_R2']))
     print('========== Test Metrics ===========')
     save_results(test_metrics, cfg.data.results_path, y_true, y_pred, prediction_years)
 
     # log test metrics to TensorBoard
     writer.add_scalar('Loss/test', test_metrics['test_loss'])
-    writer.add_scalar('RMSE/test', test_metrics['test_rmse'])
+    writer.add_scalar('NRMSE/test', test_metrics['test_nrmse'])
     writer.add_scalar('R2/test', test_metrics['test_R2'])
 
     # close the TensorBoard writer
