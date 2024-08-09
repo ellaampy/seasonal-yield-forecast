@@ -40,7 +40,7 @@ country_crop_to_crop_season = {
     },
     "US": {
         "wheat": {
-            "days": (33, 233),
+            "days": (9, 233),
             "time_steps": (4, 29),
             "month": (2, 8),
             "test_years": [2015, 2018, 2022]
@@ -213,7 +213,7 @@ def temporal_aggregation(predictors, crop_season_in_days_of_year):
     end_date = crop_season_in_days_of_year[1]
     
     # test if predictors are already in 8- (ndvi) or 10- (fpar) day bins
-    if (end_date - start_date + 1) > predictors["date"].dt.day_of_year.nunique():
+    if 365 > predictors["date"].dt.day_of_year.nunique():
         return predictors
     value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "doy"]).tolist()
     
@@ -235,7 +235,6 @@ def preprocess_temporal_data(data_list, crop_season_in_days_of_year):
     for df in data_list:
         df = df.drop(columns=["crop_name"])
         df = assign_time_columns(df)
-        df = filter_predictors_by_crop_season(df, crop_season_in_days_of_year)
         df = temporal_aggregation(df, crop_season_in_days_of_year)
         df = assign_time_steps(df)
         df = pivot_predictors(df)
