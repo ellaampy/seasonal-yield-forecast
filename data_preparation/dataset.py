@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 
 class YieldDataset(Dataset):
     def __init__(self, predictor_path, yield_path, years=None, 
-                 feature_selector=None, max_timesteps=26, temporal_truncation=None, 
+                 feature_selector=None, max_timesteps=46, temporal_truncation=None, 
                  proportion=100, state_selector=None, aez_selector=None):
         """
         Initialize the dataset 
@@ -60,7 +60,8 @@ class YieldDataset(Dataset):
             elif feature in static_features:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]]
                 filtered_df = np.repeat(filtered_df.to_numpy(), max_timesteps, axis=1)
-
+            print("==================")
+            print(filtered_df.shape)
             self.combined_features.append(filtered_df)
     
 
@@ -131,6 +132,7 @@ class YieldDataset(Dataset):
 #     yield_path=y_df_path,
 #     years=[2020],
 #     feature_selector=['ssm', 'rsm'],
+#     max_timesteps = 46,
 #     temporal_truncation=None, #[0,10]
 #     proportion=100,
 #     state_selector=['US-08'],
