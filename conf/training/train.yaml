@@ -1,0 +1,9 @@
+batch_size: 32
+learning_rate: 0.001
+epochs: 10
+optimizer: adam
+seed: 3407
+device: cuda
+num_workers: 8
+display_step: 1000
+patience: 10
