@@ -2,7 +2,7 @@
 defaults:
   - model: lstm
   - training: train
-  - data: dataloader
+  - dataset: dataloader
   - _self_
 
 
@@ -18,7 +18,7 @@ model:
 training:
   batch_size: 32
   learning_rate: 0.001
-  epochs: 10
+  epochs: 1
   optimizer: adam
   seed: 3407
   device: cpu
@@ -27,7 +27,7 @@ training:
   patience: 10
 
 
-data:
+dataset:
   predictor_path: /app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv
   yield_path: /app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv
   feature_selector: ['ndvi', 'fpar']
