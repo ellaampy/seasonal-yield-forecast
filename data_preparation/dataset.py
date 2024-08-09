@@ -46,9 +46,12 @@ class YieldDataset(Dataset):
         self.combined_features = []
         seq_feature_prefixes = ["tavg", "prec", 'tmax', 'tmin', "fpar", \
                                 "ndvi", "ssm", "rsm", "cwb", "et0", "rad"]
-        static_features = ["harvest_year", "awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(1,7)]
+        static_features = ["awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(1,7)]
 
-        
+        # use all features is no feature selection
+        if feature_selector is None:
+            feature_selector = seq_feature_prefixes + static_features
+
         for feature in feature_selector:
             if feature in seq_feature_prefixes:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]].to_numpy()
@@ -59,20 +62,17 @@ class YieldDataset(Dataset):
                 filtered_df = np.repeat(filtered_df.to_numpy(), max_timesteps, axis=1)
 
             self.combined_features.append(filtered_df)
+    
 
         # ====================== FEATURE SELECTION END ==============================
 
 
         # reconstruct array as samples x time x channels.
         self.combined_features = np.stack(self.combined_features, axis=-1)
-        print('combined features', self.combined_features.shape)
 
         # truncate time series
         self.combined_features = self._truncate_temporal(self.combined_features, \
                                                          temporal_truncation, proportion)
-        print('combined features', self.combined_features.shape)
-
-        print('data sizes', self.combined_features.shape, self.target.shape, self.ids.shape, self.years.shape)
 
 
     def _apply_filters(self, df, years, state_selector, aez_selector):
@@ -121,8 +121,8 @@ class YieldDataset(Dataset):
 
 # ### =================== TESTING BLOCKS - REMOVE DELETE AFTER USE================
 
-# x_df_path ='/app/dev/Seasonal_Climate/onedrive/ndvi_soil_soil_moisture_meteo_fpar_maize_BR.csv'
-# y_df_path = "/app/dev/Seasonal_Climate/cybench/cybench-data/maize/BR/yield_maize_BR.csv"
+# x_df_path = "/app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv"
+# y_df_path = "/app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv"
 
 
 # # Initialize YieldDataset with various parameters
@@ -133,7 +133,7 @@ class YieldDataset(Dataset):
 #     feature_selector=['ssm', 'rsm'],
 #     temporal_truncation=None, #[0,10]
 #     proportion=100,
-#     state_selector=['BR11'],
+#     state_selector=['US-08'],
 #     aez_selector=None
 # )
 
