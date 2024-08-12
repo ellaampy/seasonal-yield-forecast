@@ -20,8 +20,8 @@ def main(cfg: DictConfig):
     # print(OmegaConf.to_yaml(cfg))
 
     # create results dir and save config
-    os.makedirs(cfg.data.results_path, exist_ok=True)
-    OmegaConf.save(cfg, os.path.join(cfg.data.results_path, 'config.yaml'))
+    os.makedirs(cfg.dataset.results_path, exist_ok=True)
+    OmegaConf.save(cfg, os.path.join(cfg.dataset.results_path, 'config.yaml'))
 
     # set seed for reproducability
     np.random.seed(cfg.training.seed)
@@ -32,36 +32,39 @@ def main(cfg: DictConfig):
 
     # Initialize YieldDataset with various parameters
     train_dataset = YieldDataset(
-        predictor_path= cfg.data.predictor_path,
-        yield_path= cfg.data.yield_path,
-        years= cfg.data.train_years,
-        feature_selector= cfg.data.feature_selector,
-        temporal_truncation= cfg.data.temporal_truncation, 
-        proportion= cfg.data.proportion,
-        state_selector= cfg.data.state_selector,
-        aez_selector= cfg.data.aez_selector
+        predictor_path= cfg.dataset.predictor_path,
+        yield_path= cfg.dataset.yield_path,
+        years= cfg.dataset.train_years,
+        feature_selector= cfg.dataset.feature_selector,
+        max_timesteps= cfg.dataset.max_timesteps,
+        temporal_truncation= cfg.dataset.temporal_truncation, 
+        proportion= cfg.dataset.proportion,
+        state_selector= cfg.dataset.state_selector,
+        aez_selector= cfg.dataset.aez_selector
     )
 
     val_dataset = YieldDataset(
-        predictor_path= cfg.data.predictor_path,
-        yield_path= cfg.data.yield_path,
-        years= cfg.data.val_years,
-        feature_selector= cfg.data.feature_selector,
-        temporal_truncation= cfg.data.temporal_truncation, 
-        proportion= cfg.data.proportion,
-        state_selector= cfg.data.state_selector,
-        aez_selector= cfg.data.aez_selector
+        predictor_path= cfg.dataset.predictor_path,
+        yield_path= cfg.dataset.yield_path,
+        years= cfg.dataset.val_years,
+        feature_selector= cfg.dataset.feature_selector,
+        max_timesteps= cfg.dataset.max_timesteps,
+        temporal_truncation= cfg.dataset.temporal_truncation, 
+        proportion= cfg.dataset.proportion,
+        state_selector= cfg.dataset.state_selector,
+        aez_selector= cfg.dataset.aez_selector
     )
 
     test_dataset = YieldDataset(
-        predictor_path= cfg.data.predictor_path,
-        yield_path= cfg.data.yield_path,
-        years= cfg.data.test_years,
-        feature_selector= cfg.data.feature_selector,
-        temporal_truncation= cfg.data.temporal_truncation, 
-        proportion= cfg.data.proportion,
-        state_selector= cfg.data.state_selector,
-        aez_selector= cfg.data.aez_selector
+        predictor_path= cfg.dataset.predictor_path,
+        yield_path= cfg.dataset.yield_path,
+        years= cfg.dataset.test_years,
+        feature_selector= cfg.dataset.feature_selector,
+        max_timesteps= cfg.dataset.max_timesteps,
+        temporal_truncation= cfg.dataset.temporal_truncation, 
+        proportion= cfg.dataset.proportion,
+        state_selector= cfg.dataset.state_selector,
+        aez_selector= cfg.dataset.aez_selector
     )
 
     train_loader = torch.utils.data.DataLoader(train_dataset, num_workers=cfg.training.num_workers,  \
@@ -90,7 +93,7 @@ def main(cfg: DictConfig):
     criterion = MSELoss()
 
     # Initialize TensorBoard SummaryWriter
-    writer = SummaryWriter(log_dir=cfg.data.results_path)
+    writer = SummaryWriter(log_dir=cfg.dataset.results_path)
 
     # holder for logging training performance
     trainlog = {}
@@ -123,7 +126,7 @@ def main(cfg: DictConfig):
         writer.add_scalar('R2/val', val_metrics['val_R2'], epoch)
 
         trainlog[epoch] = {**train_metrics, **val_metrics}
-        checkpoint(trainlog, cfg.data.results_path)
+        checkpoint(trainlog, cfg.dataset.results_path)
         
 
         # Early stopping
@@ -133,7 +136,7 @@ def main(cfg: DictConfig):
             epochs_no_improve = 0  # Reset the counter if validation loss improves
             torch.save({'best epoch': best_epoch, 'state_dict': model.state_dict(),
                         'optimizer': optimizer.state_dict()},
-                       os.path.join(cfg.data.results_path, 'model.pth.tar'))
+                       os.path.join(cfg.dataset.results_path, 'model.pth.tar'))
         else:
             epochs_no_improve += 1  # Increment the counter if validation loss does not improve
         
@@ -143,7 +146,7 @@ def main(cfg: DictConfig):
 
 
     # load best model
-    model.load_state_dict(torch.load(os.path.join(cfg.data.results_path, 'model.pth.tar'))['state_dict'])
+    model.load_state_dict(torch.load(os.path.join(cfg.dataset.results_path, 'model.pth.tar'))['state_dict'])
 
     # evaluate on test data
     model.eval()
@@ -153,7 +156,7 @@ def main(cfg: DictConfig):
                                                         test_metrics['test_nrmse'], 
                                                         test_metrics['test_R2']))
     print('========== Test Metrics ===========')
-    save_results(test_metrics, cfg.data.results_path, y_true, y_pred, prediction_years)
+    save_results(test_metrics, cfg.dataset.results_path, y_true, y_pred, prediction_years)
 
     # log test metrics to TensorBoard
     writer.add_scalar('Loss/test', test_metrics['test_loss'])
