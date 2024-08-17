@@ -34,6 +34,7 @@ def main(cfg: DictConfig):
     train_dataset = YieldDataset(
         predictor_path= cfg.dataset.predictor_path,
         yield_path= cfg.dataset.yield_path,
+        norm = None,
         years= cfg.dataset.train_years,
         feature_selector= cfg.dataset.feature_selector,
         max_timesteps= cfg.dataset.max_timesteps,
@@ -46,6 +47,7 @@ def main(cfg: DictConfig):
     val_dataset = YieldDataset(
         predictor_path= cfg.dataset.predictor_path,
         yield_path= cfg.dataset.yield_path,
+        norm = train_dataset.norm_values,
         years= cfg.dataset.val_years,
         feature_selector= cfg.dataset.feature_selector,
         max_timesteps= cfg.dataset.max_timesteps,
@@ -58,6 +60,7 @@ def main(cfg: DictConfig):
     test_dataset = YieldDataset(
         predictor_path= cfg.dataset.predictor_path,
         yield_path= cfg.dataset.yield_path,
+        norm = train_dataset.norm_values,
         years= cfg.dataset.test_years,
         feature_selector= cfg.dataset.feature_selector,
         max_timesteps= cfg.dataset.max_timesteps,
