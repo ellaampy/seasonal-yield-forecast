@@ -12,11 +12,11 @@ model:
   hidden_dims: 64
   num_layers: 4
   dropout: 0.6
-  bidirectional: True
-  use_layernorm: True
+  bidirectional: true
+  use_layernorm: true
 
 training:
-  batch_size: 2
+  batch_size: 32
   learning_rate: 0.0001
   epochs: 100
   optimizer: adam
