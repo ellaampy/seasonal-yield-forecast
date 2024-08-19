@@ -2,37 +2,38 @@
 defaults:
   - model: lstm
   - training: train
-  - data: dataloader
+  - dataset: dataloader
   - _self_
 
 
 model:
   name: lstm
-  input_dim: 2
+  input_dim: 19
   hidden_dims: 64
   num_layers: 4
-  dropout: 0.2
-  bidirectional: True
-  use_layernorm: True
+  dropout: 0.6
+
 
 training:
-  batch_size: 32
-  learning_rate: 0.001
-  epochs: 10
+  batch_size: 64
+  learning_rate: 0.0001
+  epochs: 100
   optimizer: adam
   seed: 3407
-  device: cpu
-  num_workers: 8
-  display_step: 1000
+  device: cuda
+  num_workers: 4
+  display_step: 100
   patience: 10
 
 
-data:
+dataset:
   predictor_path: /app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv
   yield_path: /app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv
-  feature_selector: ['ndvi', 'fpar']
-  temporal_truncation: null
+  feature_selector: null  # e.g. ['tvag', 'drainage_class']
+  max_timesteps: 46
+  temporal_truncation: null  # e.g. [11, 15] to represent start/end index of time series
   proportion: 100
-  state_selector: ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48']
+  state_selector: ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48']  # activate for USA
+  # state_selector: ['BR41' 'BR42' 'BR43']  # activate for Brazil
   aez_selector: null
-  results_path: /app/dev/Seasonal_Climate/results/test
+  results_path: /app/dev/Seasonal_Climate/results/lstm_us
