@@ -23,7 +23,7 @@ training:
   seed: 3407
   device: cuda
   num_workers: 4
-  display_step: 1000
+  display_step: 100
   patience: 10
 
 
