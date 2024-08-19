@@ -1,0 +1,38 @@
+# config.yaml
+defaults:
+  - model: lstm
+  - training: train
+  - data: dataloader
+  - _self_
+
+
+model:
+  name: lstm
+  input_dim: 2
+  hidden_dims: 64
+  num_layers: 4
+  dropout: 0.2
+  bidirectional: True
+  use_layernorm: True
+
+training:
+  batch_size: 32
+  learning_rate: 0.001
+  epochs: 10
+  optimizer: adam
+  seed: 3407
+  device: cpu
+  num_workers: 8
+  display_step: 1000
+  patience: 10
+
+
+data:
+  predictor_path: /app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv
+  yield_path: /app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv
+  feature_selector: ['ndvi', 'fpar']
+  temporal_truncation: null
+  proportion: 100
+  state_selector: ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48']
+  aez_selector: null
+  results_path: /app/dev/Seasonal_Climate/results/test
