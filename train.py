@@ -13,7 +13,7 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 
 
-@hydra.main(config_path="conf", config_name="config")
+@hydra.main(config_path="conf", config_name="config", version_base="1.1")
 
 def main(cfg: DictConfig):
 
@@ -43,7 +43,6 @@ def main(cfg: DictConfig):
         state_selector= cfg.dataset.state_selector,
         aez_selector= cfg.dataset.aez_selector
     )
-    print(np.unique(train_dataset.state_ids))
 
     val_dataset = YieldDataset(
         predictor_path= cfg.dataset.predictor_path,
@@ -97,7 +96,8 @@ def main(cfg: DictConfig):
     criterion = MSELoss()
 
     # Initialize TensorBoard SummaryWriter
-    writer = SummaryWriter(log_dir=cfg.dataset.results_path)
+    writer_train = SummaryWriter(log_dir=os.path.join(cfg.dataset.results_path, 'log', 'train'))
+    writer_val = SummaryWriter(log_dir=os.path.join(cfg.dataset.results_path, 'log', 'val'))
 
     # holder for logging training performance
     trainlog = {}
@@ -114,20 +114,21 @@ def main(cfg: DictConfig):
                                     device=device, display_step=cfg.training.display_step)
         # print(train_metrics)
         # Log training metrics to TensorBoard
-        writer.add_scalar('Loss/train', train_metrics['train_loss'], epoch)
-        writer.add_scalar('R2/train', train_metrics['train_R2'], epoch)
+        writer_train.add_scalar('Loss', train_metrics['train_loss'], epoch)
+        writer_train.add_scalar('R2', train_metrics['train_R2'], epoch)
+
 
         # print('Validation . . . ')
         model.eval()
         val_metrics = evaluation(model, criterion, val_loader, device=device, mode='val')
-        print('Loss {:.4f},  NRMSE {:.4f}, R2 {:.4f}'.format(val_metrics['val_loss'], 
+        print('Validation      Loss  {:.4f}, NRMSE   {:.4f}, R2 {:.4f}'.format(val_metrics['val_loss'], 
                                                             val_metrics['val_nrmse'], 
                                                             val_metrics['val_R2']))
 
         # Log validation metrics to TensorBoard
-        writer.add_scalar('Loss/val', val_metrics['val_loss'], epoch)
-        writer.add_scalar('NRMSE/val', val_metrics['val_nrmse'], epoch)
-        writer.add_scalar('R2/val', val_metrics['val_R2'], epoch)
+        writer_val.add_scalar('Loss', val_metrics['val_loss'], epoch)
+        writer_val.add_scalar('R2', val_metrics['val_R2'], epoch)
+
 
         trainlog[epoch] = {**train_metrics, **val_metrics}
         checkpoint(trainlog, cfg.dataset.results_path)
@@ -138,9 +139,11 @@ def main(cfg: DictConfig):
             best_epoch = epoch
             best_RMSE = val_metrics['val_nrmse']
             epochs_no_improve = 0  # Reset the counter if validation loss improves
-            torch.save({'best epoch': best_epoch, 'state_dict': model.state_dict(),
-                        'optimizer': optimizer.state_dict()},
-                       os.path.join(cfg.dataset.results_path, 'model.pth.tar'))
+
+            ## activate to save best model
+            # torch.save({'best epoch': best_epoch, 'state_dict': model.state_dict(),
+            #             'optimizer': optimizer.state_dict()},
+            #            os.path.join(cfg.dataset.results_path, 'model.pth.tar'))
         else:
             epochs_no_improve += 1  # Increment the counter if validation loss does not improve
         
@@ -148,27 +151,28 @@ def main(cfg: DictConfig):
             print(f'Early stopping at epoch {epoch + 1}')
             break  # Stop training if no improvement for specified number of epochs
 
+## =================== ACTIVATE FOR EVALUATION ON TEST =============
+    # # load best model
+    # model.load_state_dict(torch.load(os.path.join(cfg.dataset.results_path, 'model.pth.tar'))['state_dict'])
 
-    # load best model
-    model.load_state_dict(torch.load(os.path.join(cfg.dataset.results_path, 'model.pth.tar'))['state_dict'])
+    # # evaluate on test data
+    # model.eval()
+    # test_metrics, y_true, y_pred = evaluation(model, criterion, test_loader, device=device, mode='test')
+    # print('========== Test Metrics ===========')
+    # print('Loss {:.4f},  NRMSE {:.4f}, R2 {:.4f}'.format(test_metrics['test_loss'], 
+    #                                                     test_metrics['test_nrmse'], 
+    #                                                     test_metrics['test_R2']))
+    # print('========== Test Metrics ===========')
+    # save_results(test_metrics, cfg.dataset.results_path, y_true, y_pred, prediction_years)
 
-    # evaluate on test data
-    model.eval()
-    test_metrics, y_true, y_pred = evaluation(model, criterion, test_loader, device=device, mode='test')
-    print('========== Test Metrics ===========')
-    print('Loss {:.4f},  NRMSE {:.4f}, R2 {:.4f}'.format(test_metrics['test_loss'], 
-                                                        test_metrics['test_nrmse'], 
-                                                        test_metrics['test_R2']))
-    print('========== Test Metrics ===========')
-    save_results(test_metrics, cfg.dataset.results_path, y_true, y_pred, prediction_years)
-
-    # log test metrics to TensorBoard
-    writer.add_scalar('Loss/test', test_metrics['test_loss'])
-    writer.add_scalar('NRMSE/test', test_metrics['test_nrmse'])
-    writer.add_scalar('R2/test', test_metrics['test_R2'])
+    # # log test metrics to TensorBoard
+    # writer.add_scalar('Loss/Test', test_metrics['test_loss'])
+    # writer.add_scalar('NRMSE/Test', test_metrics['test_nrmse'])
+    # writer.add_scalar('R2/Test', test_metrics['test_R2'])
 
     # close the TensorBoard writer
-    writer.close()
+    writer_train.close()
+    writer_val.close()
 
 if __name__ == "__main__":
     main()
