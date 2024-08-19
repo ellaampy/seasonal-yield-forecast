@@ -43,6 +43,7 @@ def main(cfg: DictConfig):
         state_selector= cfg.dataset.state_selector,
         aez_selector= cfg.dataset.aez_selector
     )
+    print(np.unique(train_dataset.state_ids))
 
     val_dataset = YieldDataset(
         predictor_path= cfg.dataset.predictor_path,
