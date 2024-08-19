@@ -8,15 +8,14 @@ defaults:
 
 model:
   name: lstm
-  input_dim: 2
+  input_dim: 19
   hidden_dims: 64
   num_layers: 4
   dropout: 0.6
-  bidirectional: true
-  use_layernorm: true
+
 
 training:
-  batch_size: 32
+  batch_size: 64
   learning_rate: 0.0001
   epochs: 100
   optimizer: adam
@@ -33,7 +32,6 @@ dataset:
   feature_selector: null  # e.g. ['tvag', 'drainage_class']
   max_timesteps: 46
   temporal_truncation: null  # e.g. [11, 15] to represent start/end index of time series
-  train_years: [2017, 2018]
   proportion: 100
   state_selector: ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48']  # activate for USA
   # state_selector: ['BR41' 'BR42' 'BR43']  # activate for Brazil
