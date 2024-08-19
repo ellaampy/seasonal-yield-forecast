@@ -5,7 +5,21 @@ ML for crop yield forecasting in Brazil and USA using remote sensing data and ob
 
 **1. WHEAT**
 
-**1.1 BRAZIL**
+**1.1 USA**
+
+### Crop calendar and study region
+
+For the USA, the Great Plains, inlcuding South Dakota, Nebraska, Colorado, Kansas, Oklahoma and Texas is the heartland of winter wheat production (10). Great plains states are highlighted with a blue border in the figure below. 
+
+![](data_preparation/season_wheat_US.png)
+
+### Annual state-level yield and trend
+
+Yield trend in the great plains from 2002-2022 is neglectable. Annual yield data is not detrended, we train a model to estimate absolute yield instead of yield anomalies.
+
+![](data_preparation/yield_trend_US_wheat.png)
+
+**1.2 BRAZIL**
 
 ### Test years
 
@@ -22,21 +36,6 @@ From Nóia Junior et al. (1) - The occurrence of adverse climatic events between
 ### Study region
 Around 90% of Brazilian wheat is produced in the three southern states **Paraná, Santa Catarina, and Rio Grande do Sul** (blue edgecolor in figure above) (7). Our analysis will focus on these three states only, given that they also share a similar cropping season with roughly the same planting and harvest dates and season length. Planting occurs 
 
-**1.2 USA**
-
-### Test years
-
-From (9), we identify **2015, 2018 and 2022** as the years with extreme low yields and define them as test years. Wheat production in each of these years was affected by droughts during vegetative stage associated with El Nino/ La Nina or near El Nino/ La Nina conditions (10-13).
-
-### Crop calendar
-
-![](data_preparation/season_wheat_US.png)
-
-### Study region
-
-For the USA, the Great Plains, inlcuding South Dakota, Nebraska, Colorado, Kansas, Oklahoma and Texas is the heartland of winter wheat production (14). 
-
-
 **References**
 
 <span style="font-size:0.7em;">
@@ -49,12 +48,8 @@ For the USA, the Great Plains, inlcuding South Dakota, Nebraska, Colorado, Kansa
 6. 	A. Donley, Brazil wheat output to fall in 2017-18. World-Grain.com (2018).
 7. 	F. A. S. USDA, “Gain Report - Brazilian Wheat Production, Quality Suffer After Adverse Weather” (2018).
 8. IBGE SIDRA, 2022. Tabela 1612: ´Area plantada, ´area colhida, Quantidade produzida, Rendimento Médio e Valor Da Produçao Das Lavouras Temporárias. https://sidra.ibge.gov.br/tabela/1612.
-9. USDA (2024). Winter Wheat: Yield by Year, US https://www.nass.usda.gov/Charts_and_Maps/Field_Crops/wwyld.php
-10. USDA (2022). Wheat Outlook: May 2022. https://downloads.usda.library.cornell.edu/usda-esmis/files/cz30ps64c/z316r691k/5m60rx75g/WHS-22e.pdf
-11. Braun, Karen (2022). U.S. winter wheat health among worst ever, yield prospects dicey. https://www.reuters.com/markets/commodities/us-winter-wheat-health-among-worst-ever-yield-prospects-dicey-2022-04-06/
-12. NOAA (2024). Cold & Warm Episodes by Season. https://origin.cpc.ncep.noaa.gov/products/analysis_monitoring/ensostuff/ONI_v5.php
-13. Joel Karlin (2022). Fundamentally Speaking 2022 U.S. Winter Wheat Crop Lowest Since 1970. https://www.dtnpf.com/agriculture/web/ag/blogs/fundamentally-speaking/blog-post/2022/11/29/2022-u-s-winter-wheat-crop-lowest
-14. Zhao, H., Zhang, L., Kirkham, M.B. et al. U.S. winter wheat yield loss attributed to compound hot-dry-windy events. Nat Commun 13, 7233 (2022). https://doi.org/10.1038/s41467-022-34947-6
+9. USDA (2022). Wheat Outlook: May 2022. https://downloads.usda.library.cornell.edu/usda-esmis/files/cz30ps64c/z316r691k/5m60rx75g/WHS-22e.pdf
+10. Zhao, H., Zhang, L., Kirkham, M.B. et al. U.S. winter wheat yield loss attributed to compound hot-dry-windy events. Nat Commun 13, 7233 (2022). https://doi.org/10.1038/s41467-022-34947-6
 
 </span>
 
