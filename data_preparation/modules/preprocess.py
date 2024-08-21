@@ -7,7 +7,7 @@ day_of_year_to_time_step = {
     1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
     97: 12, 105: 13, 113: 14, 121: 15, 129: 16, 137: 17, 145: 18, 153: 19, 161: 20, 
     169: 21, 177: 22, 185: 23, 193: 24, 201: 25, 209: 26, 217: 27, 225: 28, 233: 29, 
-    241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37, 305: 38, 
+    241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37,  305: 38, 
     313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 361: 45
 }
        
@@ -18,7 +18,7 @@ fpar_doy_to_time_step = {
     173: 22, 182: 23, 183: 23, 192: 24, 193: 24, 202: 26, 203: 26, 213: 27, 214: 27, 
     223: 28, 224: 28, 233: 29, 234: 29, 244: 31, 245: 31, 254: 32, 255: 32, 264: 33, 
     265: 33, 274: 35, 275: 35, 284: 36, 285: 36, 294: 37, 295: 37, 305: 38, 306: 38, 
-    315: 40, 316: 40, 325: 41, 326: 41
+    315: 40, 316: 40, 325: 41, 326: 41, 335: 42, 336: 42, 345:43, 346: 43, 355: 45, 356: 45
 }
 
 # days refers to start days fo year of first and last 8-day bin of crop season
@@ -42,7 +42,7 @@ country_crop_to_crop_season = {
         "wheat": {
             "days": (9, 233),
             "time_steps": (4, 29),
-            "month": (2, 8),
+            "month": (9, 7),
             "test_years": [2015, 2018, 2022]
         },
         "maize": {
@@ -125,8 +125,8 @@ def pivot_predictors(predictors):
     Returns:
     DataFrame: The pivoted dataframe with predictors.
     """
-    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "time_step", "doy"]).tolist()
-    predictors_pivot = predictors.dropna(subset="time_step").pivot(index=["adm_id", "harvest_year"], columns="time_step", values=value_columns).interpolate(axis=1, method='linear', limit_direction='both')
+    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "calendar_year", "date", "time_step"]).tolist()
+    predictors_pivot = predictors.dropna(subset="time_step").pivot(index=["adm_id", "harvest_year", "calendar_year"], columns="time_step", values=value_columns)
     predictors_pivot.columns = ["_".join([str(col) for col in c]).strip() for c in predictors_pivot.columns]
     predictors_pivot = predictors_pivot.reset_index()
     
@@ -147,7 +147,7 @@ def filter_predictors_by_adm_ids(predictor_list, adm_ids):
     return [predictors.loc[predictors["adm_id"].isin(adm_ids)].reset_index(drop=True) for predictors in predictor_list]
 
     
-def assign_time_steps(predictors):
+def assign_time_steps(predictors, crop, country, crop_season_in_months):
     """
     Assigns time step columns to the predictors DataFrame.
 
@@ -157,10 +157,23 @@ def assign_time_steps(predictors):
     Returns:
     DataFrame: The predictors DataFrame with time step columns.
     """  
+    #unique_fpar_ts = list(set(predictors["date"].dt.day_of_year.unique().tolist()))
+    #unique_fpar_ts.sort()
+    #print([c for c in unique_fpar_ts if c not in day_of_year_to_time_step.keys()])
     if set(predictors["date"].dt.day_of_year.unique().tolist()).issubset(fpar_doy_to_time_step.keys()):
-        return predictors.assign(time_step=predictors["date"].dt.day_of_year.map(fpar_doy_to_time_step).astype('Int64'))
+        predictors = predictors.assign(time_step=predictors["date"].dt.day_of_year.map(fpar_doy_to_time_step).astype('Int64'))
     
-    return predictors.assign(time_step=predictors["date"].dt.day_of_year.map(day_of_year_to_time_step).astype('Int64'))
+    else:
+        #doy_list = [c for c in predictors["date"].dt.day_of_year.unique().tolist() if c not in day_of_year_to_time_step.keys()]
+        #doy_list.sort()
+        #print(doy_list)
+        predictors = predictors.assign(time_step=predictors["date"].dt.day_of_year.map(day_of_year_to_time_step).astype('Int64'))
+    
+    if (crop == "wheat") & (country == "US") & (crop_season_in_months[0] >= crop_season_in_months[1]):
+        predictors.loc[predictors["date"].dt.month >= 8, "time_step"] = predictors.loc[predictors["date"].dt.month >= 8, "time_step"] - 27
+        predictors.loc[predictors["date"].dt.month <= 7, "time_step"] = predictors.loc[predictors["date"].dt.month <= 7, "time_step"] + 19
+    
+    return predictors
 
 
 def assign_time_columns(predictors):
@@ -174,8 +187,7 @@ def assign_time_columns(predictors):
     DataFrame: The predictors DataFrame with date, day of year and year columns.
     """
     predictors = predictors.assign(date=pd.to_datetime(predictors["date"], format="%Y%m%d"), 
-                                   harvest_year=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.year,
-                                   doy=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.day_of_year)
+                                   calendar_year=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.year)
     
     return predictors
 
@@ -198,35 +210,57 @@ def filter_predictors_by_crop_season(predictors, crop_season_in_days_of_year):
     return predictors.loc[(predictors["doy"].between(crop_season_start, crop_season_end)) & (predictors["harvest_year"].between(2003, 2022))].reset_index(drop=True)
 
 
-def temporal_aggregation(predictors, crop_season_in_days_of_year):
+def temporal_aggregation(predictors):
     """
     Resamples the predictors to 8-day bins.
 
     Parameters:
     predictors (DataFrame): The predictors DataFrame.
-    crop_season_in_days_of_year (tuple): The start and end of the crop season as day of year.
 
     Returns:
     DataFrame: The resampled predictors DataFrame.
     """
-    start_date = crop_season_in_days_of_year[0]
-    end_date = crop_season_in_days_of_year[1]
-    
     # test if predictors are already in 8- (ndvi) or 10- (fpar) day bins
     if 365 > predictors["date"].dt.day_of_year.nunique():
         return predictors
-    value_columns = predictors.columns.difference(["adm_id", "harvest_year", "date", "doy"]).tolist()
+    value_columns = predictors.columns.difference(["adm_id", "date", "calendar_year"]).tolist()
+    predictors = predictors.groupby(["adm_id", "calendar_year"]).resample("8D", on="date")[value_columns].mean().reset_index()
     
-    return predictors.groupby(["adm_id", "harvest_year"]).resample("8D", on="date")[value_columns].mean().reset_index()
+    return predictors
 
+def assign_harvest_year(predictors, country, crop, crop_season_in_months):
+    """
+    Assigns the harvest year to the predictors DataFrame.
+    
+    Parameters:
+    predictors (DataFrame): The predictors DataFrame.
+    country (str): The country code (e.g., "BR" for Brazil, "US" for United States).
+    crop (str): The crop type (e.g., "wheat", "maize").
+    crop_season_in_months (tuple): The start and end of the crop season as months.
+    
+    Returns:
+    predictors (DataFrame): The predictors DataFrame with the harvest year column.
+    
+    """
+    predictors = predictors.assign(harvest_year=predictors["calendar_year"])
+    if (crop == "wheat") & (country == "US") & (crop_season_in_months[0] >= crop_season_in_months[1]):
+        predictors.loc[predictors["date"].dt.month >= crop_season_in_months[0], "harvest_year"] = predictors.loc[predictors["date"].dt.month >= crop_season_in_months[0], "calendar_year"] + 1
+        
+    return predictors
+    
+def combine_rows(group):
+    return group.iloc[0].combine_first(group.iloc[1])
 
-def preprocess_temporal_data(data_list, crop_season_in_days_of_year):
+def preprocess_temporal_data(data_list, crop_season_in_months, crop_season_in_days_of_year, crop, country):
     """
     Preprocesses the temporal predictor datasets.
     
     Parameters:
     data_list (list): A list of pandas DataFrames containing the temporal predictor datasets.
+    crop_season_in_months (tuple): Crop season in months
     crop_season_in_days_of_year (tuple): Crop season in days of year
+    crop: The crop type (e.g., "wheat", "maize").
+    country: The country code (e.g., "BR" for Brazil, "US" for United States).
     
     Returns:
     list: A list of preprocessed pandas DataFrames.
@@ -235,9 +269,14 @@ def preprocess_temporal_data(data_list, crop_season_in_days_of_year):
     for df in data_list:
         df = df.drop(columns=["crop_name"])
         df = assign_time_columns(df)
-        df = temporal_aggregation(df, crop_season_in_days_of_year)
-        df = assign_time_steps(df)
+        if "rsm" in df.columns:
+            df = df.loc[df["date"] >= pd.to_datetime("20030202" , format="%Y%m%d")].reset_index(drop=True)
+        df = temporal_aggregation(df)
+        df = assign_harvest_year(df, country, crop, crop_season_in_months)
+        df = assign_time_steps(df, crop, country, crop_season_in_months)
         df = pivot_predictors(df)
+        if (crop == "wheat") & (country == "US") & (crop_season_in_months[0] >= crop_season_in_months[1]):
+            df = df.loc[df["harvest_year"].between(2004, 2023)].groupby(['adm_id', 'harvest_year']).apply(combine_rows).drop(["adm_id", "harvest_year", "calendar_year"], axis=1).interpolate(axis=1, method='linear', limit_direction='both').reset_index()
         processed_data.append(df)
         
     return processed_data
