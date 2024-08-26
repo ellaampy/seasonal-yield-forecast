@@ -5,7 +5,7 @@ import os, json
 import pickle as pkl
 import numpy as np
 from scipy.stats import pearsonr
-from sklearn.metrics import r2_score
+from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, r2_score
 
 
 
@@ -112,5 +112,18 @@ def save_results(metrics, dir, y_true, y_pred, years):
     pkl.dump(years, open(os.path.join(dir,  'years_test_data.pkl'), 'wb'))
 
     
-
 # =====================
+
+def evalMetrics(true, predicted):
+    """
+    returns computes metrics given reference and predicted values
+    """
+    mape = np.round(mean_absolute_percentage_error(true, predicted)*100,2)
+    rmse = np.round(np.sqrt(mean_squared_error(true, predicted)), 2)
+    nrmse = np.round(np.sqrt(mean_squared_error(true, predicted)), 2)/np.mean(predicted)
+    r2 = np.round(r2_score(true, predicted), 2)
+    corr = np.round(pearsonr(true, predicted)[0], 2)
+
+    return mape, rmse, nrmse, r2, corr
+
+# ================ HELPER FUNCTIONS METRICS COMPUTATION

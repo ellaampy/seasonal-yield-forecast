@@ -101,7 +101,7 @@ def main(cfg: DictConfig):
 
     # holder for logging training performance
     trainlog = {}
-    best_RMSE = np.inf
+    best_loss = np.inf
     epochs_no_improve = 0 
     
 
@@ -135,9 +135,9 @@ def main(cfg: DictConfig):
         
 
         # Early stopping
-        if val_metrics['val_nrmse'] < best_RMSE:
+        if val_metrics['val_loss'] < best_loss:
             best_epoch = epoch
-            best_RMSE = val_metrics['val_nrmse']
+            best_loss = val_metrics['val_loss']
             epochs_no_improve = 0  # Reset the counter if validation loss improves
 
             ## activate to save best model
@@ -173,6 +173,8 @@ def main(cfg: DictConfig):
     # close the TensorBoard writer
     writer_train.close()
     writer_val.close()
+
+    print('Best validation loss ==> ', best_loss)
 
 if __name__ == "__main__":
     main()

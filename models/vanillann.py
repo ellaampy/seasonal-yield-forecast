@@ -40,3 +40,33 @@ class SimpleModel(nn.Module):
     
 
 
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
+
+class MLP(nn.Module):
+    def __init__(self, input_dim=15, sequence_len=46, hidden_dim1=512, hidden_dim2 =256, dropout = 0.2):
+        super(MLP, self).__init__()
+        self.modelname = f"FCN_input-dim={input_dim}_sequence_len={sequence_len}_hidden-dim1={hidden_dim1}_" \
+                    f"hidden-dims2={hidden_dim2}_dropout={dropout}"
+
+        self.input_dim = input_dim
+        self.sequence_len = sequence_len
+        self.hidden_dim1 = hidden_dim1
+        self.hidden_dim2 = hidden_dim2
+        self.dropout = nn.Dropout(dropout)
+        self.fc1 = nn.Linear(self.input_dim*self.sequence_len, self.hidden_dim1)
+        self.fc2 = nn.Linear(self.hidden_dim1, self.hidden_dim2)
+        self.fc3 = nn.Linear(self.hidden_dim2, 1)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x =  x.view(x.shape[0], -1)
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)
+        x = x.squeeze(-1)
+        return x
+
