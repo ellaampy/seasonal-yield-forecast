@@ -19,17 +19,17 @@ from data_preparation.dataset import YieldDataset
 
 config = {
     'results_path': '/app/dev/Seasonal_Climate/results/tuning',
-    'predictor_path': '/app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv',
+    'predictor_path': '/app/dev/Seasonal_Climate/onedrive/cy_bench_16daybins_wheat_US_v2.csv',
     'yield_path': '/app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv',
     'feature_selector': None,  
-    'max_timesteps': 46,
-    'temporal_truncation': None,  
+    'max_timesteps': 23,
+    'temporal_truncation': [3, 24],  
     'proportion': 100,
     'state_selector': ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48'],  # ['BR41' 'BR42' 'BR43'] 
     'aez_selector': None,
     'train_years': list(range(2004, 2018)),
     'val_years': [2018, 2019, 2020],
-    'test_years': [2021, 2022],
+    'test_years': [2021, 2022, 2023],
     'device': 'cuda',
     'display_step': 20,
     'input_dim': 19,
@@ -37,8 +37,8 @@ config = {
     'seed': 3407,
     'optimizer_switch': 'ADAM',
     'epochs':50,
-    'num_trials':1,
-    'patience':6
+    'num_trials':20,
+    'patience':10
 }
 
 
@@ -115,13 +115,17 @@ def main(config, params, trial=None):
 
     # holder for logging training performance during epochs
     trainlog = {}
-    best_RMSE = np.inf
+    best_loss = np.inf
     no_improvement_count = 0
     
 
     # log training and val loss 
     t_loss = []
+    t_nrmse = []
+    t_r2 = []
     v_loss = []
+    v_nrmse = []
+    v_r2 = []
 
     try:
         for epoch in range(1, config['epochs'] + 1):
@@ -139,20 +143,24 @@ def main(config, params, trial=None):
 
 
             # log training and validation loss
-            t_loss.append(np.round(train_metrics['train_loss'],2))
-            v_loss.append(np.round(val_metrics['val_loss'],2))
+            t_loss.append(np.round(train_metrics['train_loss'],3))
+            t_nrmse.append(np.round(train_metrics['train_nrmse'],3))
+            t_r2.append(np.round(train_metrics['train_R2'],3))
+            v_loss.append(np.round(val_metrics['val_loss'],3))
+            v_nrmse.append(np.round(val_metrics['val_nrmse'],3))
+            v_r2.append(np.round(val_metrics['val_R2'],3))
                 
-            # Report the validation accuracy to Optuna
+            # Report the validation score to Optuna
             if trial is not None:
-                trial.report(val_metrics['val_nrmse'], epoch)
+                trial.report(val_metrics['val_loss'], epoch)
 
-                # Check for early stopping based on validation accuracy
-                if best_RMSE > val_metrics['val_nrmse']:
-                    best_RMSE = val_metrics['val_nrmse']
+                # Check for early stopping based on validation score
+                if best_loss > val_metrics['val_loss']:
+                    best_loss = val_metrics['val_loss']
                     no_improvement_count = 0
                 else:
                     no_improvement_count += 1
-            # Prune the trial if the accuracy is not improving
+            # Prune the trial if the score is not improving
             if no_improvement_count >= config['patience']:
                 raise optuna.exceptions.TrialPruned()
                                 
@@ -162,10 +170,14 @@ def main(config, params, trial=None):
         #  return float('inf')
 
     finally:
-        trial.set_user_attr('train_losses', t_loss)
-        trial.set_user_attr('val_losses', v_loss)
+        trial.set_user_attr('train_loss', t_loss)
+        trial.set_user_attr('val_loss', v_loss)
+        trial.set_user_attr('train_nrmse', t_nrmse)
+        trial.set_user_attr('val_nrmse', v_nrmse)
+        trial.set_user_attr('train_R2', t_r2)
+        trial.set_user_attr('val_R2', v_r2)
 
-    return val_metrics['val_nrmse']
+    return val_metrics['val_loss']
 
 
 
@@ -218,11 +230,11 @@ for m in ['LSTM']:
     with open(os.path.join(config['results_path'], "{}_study.pkl".format(m)), "wb") as f:
         pkl.dump(study, f)
 
-    # Get the best hyperparameters and corresponding accuracy
+    # Get the best hyperparameters and corresponding score
     best_params = study.best_params
-    best_accuracy = study.best_value
+    best_score = study.best_value
     print(f"Best Hyperparameters: {best_params}")
-    print(f"Best Validation RMSE: {best_accuracy}")
+    print(f"Best Validation Loss: {best_score}")
     
     print('CURRENTLY TUNING ---->')
 
