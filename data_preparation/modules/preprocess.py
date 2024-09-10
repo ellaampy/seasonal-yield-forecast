@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 from scipy.stats import gamma, norm
+from shapely.geometry import Point
+from scipy.spatial.distance import cdist
+
+static_features = ["awc", "bulk_density", "drainage_class_1", "drainage_class_2", "drainage_class_3", "drainage_class_4", "drainage_class_5", "drainage_class_6"]
+temporal_prefixes = ["tavg", "prec", "tmin", "tmax", "ndvi", "fpar", "rad", "et0", "cwb", "ssm", "rsm"]
 
 day_of_year_to_time_step = {
     1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
@@ -28,30 +33,31 @@ country_crop_to_crop_season = {
             "days": (129, 329),
             "time_steps": (16, 41),
             "month": (5, 11),
-            "test_years": [2006, 2015, 2017]
+            "test_years": [2021, 2022, 2023]
         },
         "maize": {
             "days": (1, 201),
             "time_steps": (0, 25),
             "month": (1, 7),
-            "test_years": [2006, 2015, 2017] # TODO: define test years
+            "test_years": [2021, 2022, 2023] 
         },
         "shapefile_path": "../data/shapefiles/BR/bra_admbnda_adm2_ibge_2020.shp"
     },
     "US": {
         "wheat": {
-            "days": (9, 233),
-            "time_steps": (4, 29),
-            "month": (9, 7),
-            "test_years": [2015, 2018, 2022]
+            "days": (1, 209),
+            "time_steps": (27, 26),
+            "offset": 19,
+            "month": (1, 7),
+            "test_years": [2021, 2022, 2023]
         },
         "maize": {
             "days": (97, 297),
             "time_steps": (12, 37),
             "month": (4, 10),
-            "test_years": [2006, 2015, 2017] # TODO: define test years
+            "test_years": [2021, 2022, 2023] 
         },
-        "shapefile_path": "../data/shapefiles/US/tl_2023_us_county/tl_2023_us_county.shp"
+        "shapefile_path": "../data/shapefiles/US/tl_2023_us_county.shp"
     }
 }
 
@@ -61,21 +67,20 @@ def get_study_metadata(country, crop):
     Returns the file paths, crop season and test years for a given country and crop.
 
     Parameters:
-    country (str): The country code (e.g., "BR" for Brazil, "US" for United States).
-    crop (str): The crop type (e.g., "wheat", "maize").
-
+        country (str): The country code (e.g., "BR" for Brazil, "US" for United States).
+        crop (str): The crop type (e.g., "wheat", "maize").
     Returns:
-    tuple: A tuple containing the shapefile path, the crop season start and end as days of year and months and test years.
-
+        tuple: A tuple containing the shapefile path, the crop season start and end as days of year and months and test years.
     Raises:
-    ValueError: If an invalid country or crop is provided.
+        ValueError: If an invalid country or crop is provided.
     """    
     shapefile_path = country_crop_to_crop_season[country]["shapefile_path"]
     crop_season_in_days_of_year = country_crop_to_crop_season[country][crop]["days"]
     crop_season_in_months = country_crop_to_crop_season[country][crop]["month"]
+    offset = country_crop_to_crop_season[country][crop]["offset"]
     test_years = country_crop_to_crop_season[country][crop]["test_years"]
-
-    return (shapefile_path, crop_season_in_days_of_year, crop_season_in_months, test_years)
+    
+    return (shapefile_path, crop_season_in_days_of_year, crop_season_in_months, offset, test_years)
 
 
 def resample_era(era):
@@ -84,29 +89,127 @@ def resample_era(era):
     to an 8-day frequency.
 
     Parameters:
-    era (DataFrame): The ERA dataset to be resampled.
-
+        era (DataFrame): The ERA dataset to be resampled.
     Returns:
-    DataFrame: The resampled ERA dataset with additional columns 'start_date_bin' and 'time_step'.
+        DataFrame: The resampled ERA dataset with additional columns 'start_date_bin' and 'time_step'.
     """
     era_resampled = (era
-                    .groupby(["adm_id", "harvest_year"]).resample("8D", on="date")[["tmin", "tmax", "prec", "tavg"]].mean().reset_index()
+                    .groupby(["adm_id", "year"]).resample("8D", on="date")[["tmin", "tmax", "prec", "tavg"]].mean().reset_index()
                     .rename(columns={"date":"start_date_bin"})
                     )
     era_resampled = era_resampled.assign(time_step=era_resampled["start_date_bin"].apply(lambda x: day_of_year_to_time_step[x.day_of_year]))
     
     return era_resampled
 
+def transform_to_time_step(val, df, id_vars=['adm_id', 'year']):
+    df_transformed = df.melt(id_vars=id_vars, value_vars=[col for col in df.columns if col.startswith('{}_'.format(val))], var_name='time_step', value_name=val)
+    df_transformed['time_step'] = df_transformed['time_step'].str.split('_').str[1].astype(int)
+    return df_transformed
+
+def interpolate_fpar_timesteps(df, reference_quantity):
+    """ 
+    interpolate fpar values for all timesteps of a reference quantity.
+    
+    Params:
+        df: pd.DataFrame, dataframe containing the fpar columns
+        reference_quantity: str, reference quantity with complete  timesteps
+    Returns:
+        df: pd.DataFrame, dataframe with interpolated fpar values
+    
+    """
+    min_time_step = min([int(c.split("_")[1]) for c in [l for l in df.columns if reference_quantity in l]])
+    max_time_step = max([int(c.split("_")[1]) for c in [l for l in df.columns if reference_quantity in l]])
+    fpar_columns = [c for c in df.columns if "fpar" in c]
+    fpar_columns_all_timesteps = ["fpar_{}".format(n) for n in list(range(min_time_step, max_time_step + 1))]
+    new_fpar_columns = list(set(fpar_columns_all_timesteps).difference(set(fpar_columns)))
+    df[new_fpar_columns] = np.nan
+    df[fpar_columns_all_timesteps] = df[fpar_columns_all_timesteps].interpolate(method='linear', axis=1, limit_direction='both')
+    df = df.reindex(sorted(df.columns), axis=1) 
+
+    return df
+
+def temporal_aggregation_from8day_to_window(df, feature_prefix_list, window_size):
+    """ 
+    Aggregate steps of temporal features and return the resulting dataframe.
+    
+    Params:
+        df: pd.DataFrame, dataframe containing the features and time steps as column names
+        feature_prefix_list: list, list of prefixes of temporal features that should be aggregated
+        window_size: int, number of steps to aggregate by 
+    """ 
+    
+    df  = df.set_index(static_features + ["adm_id", "harvest_year"], append=False)
+    li = []
+    for feature in feature_prefix_list:
+        res = df[get_temporal_feature_subset(df, [feature])].rolling(window=window_size, min_periods=1, axis=1).mean()
+        res = res.iloc[:, 1::2] 
+        li.append(res) 
+   
+    df = pd.concat(li, axis=1).reset_index()
+    return df 
+
+def get_temporal_feature_subset(df, feature_prefix_list):
+    """ 
+    Filter temporal features by prefix and return the resulting list of features names.
+    
+    Params:
+        df: pd.DataFrame, dataframe containing the features as column names
+        feature_prefix_list: list, list of prefixes to filter by
+    Returns:
+        filtered_temporal_features: list, list of filtered temporal feature names
+    """
+    all_columns = df.columns
+    filtered_temporal_features  = [f for f in all_columns if any([f.startswith(prefix) for prefix in feature_prefix_list])]
+    return filtered_temporal_features 
+
+def order_temporal_features(df, temporal_prefixes):
+    candidate_columns = [c for c in df.columns if c.split("_")[0] in temporal_prefixes]
+    formated_candidate_columns = format_column_names(candidate_columns)
+    df = df.rename(columns=dict(zip(candidate_columns, formated_candidate_columns)))
+    df = df.reindex(sorted(df.columns), axis=1)
+    df = df.set_index(["harvest_year"], append=True).reset_index(level=[1])
+    return df
+
+def format_column_names(column_names):
+    formatted_columns = [] 
+    for name in column_names:
+        prefix, number = name.split('_')
+        formatted_name = f"{prefix}_{int(number):02d}"
+        formatted_columns.append(formatted_name) 
+    return formatted_columns
+
+
+def pivot_ecmwf(ecmwf, adjust_time_step=True):
+    """
+    Pivots the ECMWF dataframe.
+    
+    Parameters:
+        ecmwf (DataFrame): ECMWF dataframe
+    Returns:
+        ecmwf_pivot (DataFrame): Pivoted ECMWF dataframe
+    """
+    if adjust_time_step:
+        offset = 19
+    else:
+        offset = 0
+    ecmwf = ecmwf.assign(time_step = ecmwf["time_step"] + offset,
+                         init_time_step = ecmwf["time_step"].min() + offset, 
+                         year = ecmwf["init_date"].dt.year)
+    ecmwf = ecmwf.pivot(index=["adm_id", "number", "init_date", "init_time_step", "year"], 
+                        columns="time_step", values=["tavg", "tmin", "tmax", "prec"])
+    ecmwf.columns = ["_".join([str(col) for col in c]).strip() for c in ecmwf.columns]
+    ecmwf = ecmwf.reset_index()
+    
+    return ecmwf  
 
 def pivot_era(era):
     """
     Pivots the ERA dataframe.
     
     Parameters:
-    era (DataFrame): ERA dataframe
-    
+        era (DataFrame): ERA dataframe
     Returns:
-    era_pivot (DataFrame): Pivoted ERA dataframe
+        era_pivot (DataFrame): Pivoted ERA dataframe
     """
     era_pivot = era.pivot(index=["adm_id", "harvest_year"], columns="time_step", values=["tavg", "tmin", "tmax", "prec"]).reset_index()
     era_pivot.columns = ["_".join([str(col) for col in c]).strip("_") for c in era_pivot.columns]
@@ -120,10 +223,9 @@ def pivot_predictors(predictors):
     Pivots the predictors dataframe by time step.
 
     Parameters:
-    predictors (DataFrame): The input dataframe containing the predictors.
-
+        predictors (DataFrame): The input dataframe containing the predictors.
     Returns:
-    DataFrame: The pivoted dataframe with predictors.
+        DataFrame: The pivoted dataframe with predictors.
     """
     value_columns = predictors.columns.difference(["adm_id", "harvest_year", "calendar_year", "date", "time_step"]).tolist()
     predictors_pivot = predictors.dropna(subset="time_step").pivot(index=["adm_id", "harvest_year", "calendar_year"], columns="time_step", values=value_columns)
@@ -133,16 +235,52 @@ def pivot_predictors(predictors):
     return predictors_pivot
 
 
+def temporal_aggregation_ecmwf(df, feature_prefix_list, static_features, window_size):
+    """ 
+    Aggregate steps of temporal features and return the resulting dataframe.
+    
+    Parameters:
+        df: pd.DataFrame, dataframe containing the features and time steps as column names
+        feature_prefix_list: list, list of prefixes of temporal features that should be aggregated
+        window_size: int, number of steps to aggregate by 
+    Returns:
+        df: pd.DataFrame, dataframe with aggregated temporal features
+    """ 
+    df  = df.set_index(static_features, append=False)
+    li = []
+    for feature in feature_prefix_list:
+        res = df[get_temporal_feature_subset(df, [feature])].rolling(window=window_size, min_periods=1, axis=1).mean()
+        res = res.iloc[:, 1::2] 
+        li.append(res) 
+   
+    df = pd.concat(li, axis=1).reset_index()
+    return df 
+
+
+def get_temporal_feature_subset(df, feature_prefix_list):
+    """ 
+    Filter temporal features by prefix and return the resulting list of features names.
+    
+    Parameters:
+        df: pd.DataFrame, dataframe containing the features as column names
+        feature_prefix_list: list, list of prefixes to filter by
+    Returns:
+        filtered_temporal_features: list, list of filtered temporal feature names
+    """
+    all_columns = df.columns
+    filtered_temporal_features  = [f for f in all_columns if any([f.startswith(prefix) for prefix in feature_prefix_list])]
+    return filtered_temporal_features
+
+
 def filter_predictors_by_adm_ids(predictor_list, adm_ids):
     """
     Filters the predictors by the provided adm_ids.
 
     Parameters:
-    predictor_list (list of DataFrames): The predictor DataFrames.
-    adm_ids (list of str): The list of adm_ids to filter.
-
+        predictor_list (list of DataFrames): The predictor DataFrames.
+        adm_ids (list of str): The list of adm_ids to filter.
     Returns:
-    list of pd.DataFrames: The list of filtered predictor DataFrames.
+        list of pd.DataFrames: The list of filtered predictor DataFrames.
     """
     return [predictors.loc[predictors["adm_id"].isin(adm_ids)].reset_index(drop=True) for predictors in predictor_list]
 
@@ -152,10 +290,9 @@ def assign_time_steps(predictors, crop, country, crop_season_in_months):
     Assigns time step columns to the predictors DataFrame.
 
     Parameters:
-    predictors (DataFrame): The predictors DataFrame.
-
+        predictors (DataFrame): The predictors DataFrame.
     Returns:
-    DataFrame: The predictors DataFrame with time step columns.
+        DataFrame: The predictors DataFrame with time step columns.
     """  
     #unique_fpar_ts = list(set(predictors["date"].dt.day_of_year.unique().tolist()))
     #unique_fpar_ts.sort()
@@ -181,10 +318,9 @@ def assign_time_columns(predictors):
     Assigns time columns to the predictors DataFrame.
 
     Parameters:
-    predictors (DataFrame): The predictors DataFrame.
-
+        predictors (DataFrame): The predictors DataFrame.
     Returns:
-    DataFrame: The predictors DataFrame with date, day of year and year columns.
+        DataFrame: The predictors DataFrame with date, day of year and year columns.
     """
     predictors = predictors.assign(date=pd.to_datetime(predictors["date"], format="%Y%m%d"), 
                                    calendar_year=pd.to_datetime(predictors["date"], format="%Y%m%d").dt.year)
@@ -197,28 +333,29 @@ def filter_predictors_by_crop_season(predictors, crop_season_in_days_of_year):
     Filters the predictors by the crop season start and end.
 
     Parameters:
-    predictors (DataFrame): The predictors DataFrame.
-    crop_season_start (int): The day of year of the first bin of the crop season start month.
-    crop_season_end (int): The day of year of the last bin of the crop season end month.
-
+        predictors (DataFrame): The predictors DataFrame.
+        crop_season_start (int): The day of year of the first bin of the crop season start month.
+        crop_season_end (int): The day of year of the last bin of the crop season end month.
     Returns:
-    DataFrame: The filtered predictors DataFrame.
+        DataFrame: The filtered predictors DataFrame.
     """
     crop_season_start = crop_season_in_days_of_year[0]
     crop_season_end = crop_season_in_days_of_year[1]
     
-    return predictors.loc[(predictors["doy"].between(crop_season_start, crop_season_end)) & (predictors["harvest_year"].between(2003, 2022))].reset_index(drop=True)
+    predictors = predictors.assign(doy=predictors["date"].dt.day_of_year)
+    predictors = predictors.loc[(predictors["doy"].between(crop_season_start, crop_season_end)) & (predictors["calendar_year"].between(2004, 2023))].reset_index(drop=True)
+    
+    return predictors
 
 
-def temporal_aggregation(predictors):
+def temporal_aggregation_8day(predictors):
     """
     Resamples the predictors to 8-day bins.
 
     Parameters:
-    predictors (DataFrame): The predictors DataFrame.
-
+        predictors (DataFrame): The predictors DataFrame.
     Returns:
-    DataFrame: The resampled predictors DataFrame.
+        DataFrame: The resampled predictors DataFrame.
     """
     # test if predictors are already in 8- (ndvi) or 10- (fpar) day bins
     if 365 > predictors["date"].dt.day_of_year.nunique():
@@ -233,14 +370,12 @@ def assign_harvest_year(predictors, country, crop, crop_season_in_months):
     Assigns the harvest year to the predictors DataFrame.
     
     Parameters:
-    predictors (DataFrame): The predictors DataFrame.
-    country (str): The country code (e.g., "BR" for Brazil, "US" for United States).
-    crop (str): The crop type (e.g., "wheat", "maize").
-    crop_season_in_months (tuple): The start and end of the crop season as months.
-    
+        predictors (DataFrame): The predictors DataFrame.
+        country (str): The country code (e.g., "BR" for Brazil, "US" for United States).
+        crop (str): The crop type (e.g., "wheat", "maize").
+        crop_season_in_months (tuple): The start and end of the crop season as months.
     Returns:
-    predictors (DataFrame): The predictors DataFrame with the harvest year column.
-    
+        predictors (DataFrame): The predictors DataFrame with the harvest year column.
     """
     predictors = predictors.assign(harvest_year=predictors["calendar_year"])
     if (crop == "wheat") & (country == "US") & (crop_season_in_months[0] >= crop_season_in_months[1]):
@@ -256,14 +391,13 @@ def preprocess_temporal_data(data_list, crop_season_in_months, crop_season_in_da
     Preprocesses the temporal predictor datasets.
     
     Parameters:
-    data_list (list): A list of pandas DataFrames containing the temporal predictor datasets.
-    crop_season_in_months (tuple): Crop season in months
-    crop_season_in_days_of_year (tuple): Crop season in days of year
-    crop: The crop type (e.g., "wheat", "maize").
-    country: The country code (e.g., "BR" for Brazil, "US" for United States).
-    
+        data_list (list): A list of pandas DataFrames containing the temporal predictor datasets.
+        crop_season_in_months (tuple): Crop season in months
+        crop_season_in_days_of_year (tuple): Crop season in days of year
+        crop: The crop type (e.g., "wheat", "maize").
+        country: The country code (e.g., "BR" for Brazil, "US" for United States).
     Returns:
-    list: A list of preprocessed pandas DataFrames.
+        list: A list of preprocessed pandas DataFrames.
     """
     processed_data = []
     for df in data_list:
@@ -271,7 +405,7 @@ def preprocess_temporal_data(data_list, crop_season_in_months, crop_season_in_da
         df = assign_time_columns(df)
         if "rsm" in df.columns:
             df = df.loc[df["date"] >= pd.to_datetime("20030202" , format="%Y%m%d")].reset_index(drop=True)
-        df = temporal_aggregation(df)
+        df = temporal_aggregation_8day(df)
         df = assign_harvest_year(df, country, crop, crop_season_in_months)
         df = assign_time_steps(df, crop, country, crop_season_in_months)
         df = pivot_predictors(df)
@@ -287,14 +421,13 @@ def format_ecmwf_columns(ecmwf):
     Formats the columns of the ECMWF dataframe.
     
     Parameters:
-    ecmwf (pd.DataFrame): ECMWF dataframe
-    
+        ecmwf (pd.DataFrame): ECMWF dataframe
     Returns:
-    ecmwf (pd.DataFrame): ECMWF dataframe with formatted columns
+        ecmwf (pd.DataFrame): ECMWF dataframe with formatted columns
     """
     ecmwf = ecmwf.rename(columns={"t2m":"tavg", "tp":"prec", "mx2t24":"tmax", "mn2t24":"tmin", "time":"init_date"}).drop(columns=["surface", "step"])
     ecmwf = ecmwf.assign(valid_time=pd.to_datetime(ecmwf["valid_time"]), init_date=pd.to_datetime(ecmwf["init_date"]), 
-                        doy=pd.to_datetime(ecmwf["valid_time"]).dt.day_of_year, harvest_year=pd.to_datetime(ecmwf["init_date"]).dt.year,
+                        doy=pd.to_datetime(ecmwf["valid_time"]).dt.day_of_year, year=pd.to_datetime(ecmwf["init_date"]).dt.year,
                         location=ecmwf["latitude"].astype(int).astype(str) + ", " + ecmwf["longitude"].astype(int).astype(str),
                         tavg=ecmwf["tavg"] - 273.15, tmax=ecmwf["tmax"] - 273.15, tmin=ecmwf["tmin"] - 273.15,
                         prec=ecmwf.groupby(["init_date", "latitude", "longitude"])["prec"].transform(lambda x: x.diff().fillna(x).clip(lower=0) * 1000))
@@ -307,19 +440,18 @@ def resample_ecmwf(ecmwf, crop_season_in_doy):
     Resamples the ECMWF data to 8-day bins.
     
     Parameters:
-    ecmwf (DataFrame): The ECMWF data to be resampled.
-    crop_season_in_doy (tuple): The start and end of the crop season as day of year.
-        
+        ecmwf (DataFrame): The ECMWF data to be resampled.
+        crop_season_in_doy (tuple): The start and end of the crop season as day of year.    
     Returns:
-    ecmwf_resampled (DataFrame): The resampled ECMWF data.
+        ecmwf_resampled (DataFrame): The resampled ECMWF data.
     """
     start_doy, end_doy = calculate_start_and_end_doy(ecmwf, crop_season_in_doy)
     li = []
-    for year in ecmwf["harvest_year"].unique():
-        ecmwf_year = ecmwf[(ecmwf["harvest_year"] == year) & (ecmwf["valid_time"].dt.year == year)
+    for year in ecmwf["year"].unique():
+        ecmwf_year = ecmwf[(ecmwf["year"] == year) & (ecmwf["valid_time"].dt.year == year)
                            & (ecmwf["doy"].between(start_doy, end_doy+7))].reset_index(drop=True)
         ecmwf_year_resampled = (ecmwf_year
-                                .groupby(["init_date", "harvest_year", "location"])
+                                .groupby(["init_date", "year", "location", "number"])
                                 .resample("8D", on="valid_time")[["tavg", "tmax", "tmin", "prec"]].mean().reset_index()
                                 .rename(columns={"valid_time":"start_date_bin"})
                                 )
@@ -345,14 +477,13 @@ def calculate_start_and_end_doy(ecmwf, crop_season_in_days_of_year):
     Calculates the start and end day of year for the ECMWF data.
     
     Parameters:
-    ecmwf (pd.DataFrame): ECMWF dataframe
-    crop_season_in_days_of_year (tuple): Crop season in days of year
-    
+        ecmwf (pd.DataFrame): ECMWF dataframe
+        crop_season_in_days_of_year (tuple): Crop season in days of year
     Returns:
-    start_doy (int): Bin start as day of year
-    end_doy (int): Bin end as day of year
+        start_doy (int): Bin start as day of year
+        end_doy (int): Bin end as day of year
     """
-    first_doy_available_in_all_years = ecmwf.loc[(ecmwf["harvest_year"] == ecmwf["valid_time"].dt.year)].groupby("harvest_year")["doy"].min().max()
+    first_doy_available_in_all_years = ecmwf.loc[(ecmwf["year"] == ecmwf["valid_time"].dt.year)].groupby("year")["doy"].min().max()
     start_doy = np.intersect1d(list(range(first_doy_available_in_all_years, ecmwf.doy.unique().max())), list(range(crop_season_in_days_of_year[0], crop_season_in_days_of_year[1]+1, 8))).min()
     end_doy = crop_season_in_days_of_year[1]
     
@@ -364,12 +495,11 @@ def create_adm_unit_level_forecast_dataframe(list_of_index_values, index_names, 
     Creates a DataFrame that can store forecasts on adm_id level for each time step for a corresponding ECWMF grid cell.
     
     Parameters:
-    list_of_index_values (list of lists/arrays): The lists of values for the Cartesian product.
-    index_names (list of str): The names of the indices.
-    adm_units_shapefile (geoDataFrame): A geodataframe containing the polygons of the administrative units.
-    
+        list_of_index_values (list of lists/arrays): The lists of values for the Cartesian product.
+        index_names (list of str): The names of the indices.
+        adm_units_shapefile (geoDataFrame): A geodataframe containing the polygons of the administrative units.
     Returns:
-    DataFrame: A DataFrame that can store forecasts on adm_id level for each time step for a corresponding ECWMF grid cell.
+        DataFrame: A DataFrame that can store forecasts on adm_id level for each time step for a corresponding ECWMF grid cell.
     """
     multi_index = pd.MultiIndex.from_product(list_of_index_values, names=index_names)
     df = pd.DataFrame(index=multi_index).reset_index()
@@ -383,16 +513,50 @@ def create_adm_unit_level_forecast_dataframe(list_of_index_values, index_names, 
     return df
 
 
+def get_era_for_n_nearest_neighbors(df, adm_id, n, distance_df):
+    """
+    Return ERA data for n nearest neighbors for a given adm_id.
+    
+    Parameters:
+        df (DataFrame): The ERA data.
+        adm_id (str): The administrative unit ID.
+        n (int): The number of nearest neighbors.
+        distance_df (DataFrame): A DataFrame containing the pairwise distances between the centroids of the administrative units.
+    Returns:
+        DataFrame: The ERA data for n nearest neighbors.
+    """
+    nearest_neighbours = distance_df.loc[adm_id, :].sort_values().index.tolist()[:n]
+    df = df.loc[(df["year"].between(2004, 2017)) 
+                & (df["adm_id"].isin(nearest_neighbours))].reset_index(drop=True)
+    
+    return df
+
+
+def calculate_pairwise_distances(country_gpd_crop):
+    """
+    Calculate pairwise distances between the centroids of the administrative units.
+    
+    Parameters:
+        country_gpd_crop (geoDataFrame): A geodataframe containing the polygons of the administrative units.
+    Returns:
+        distance_df (DataFrame): A DataFrame containing the pairwise distances between the centroids of the administrative units.
+    """
+    country_gpd_crop['centroid'] = country_gpd_crop.geometry.to_crs(epsg=32723).centroid
+    centroids = country_gpd_crop['centroid'].apply(lambda geom: (geom.x, geom.y)).tolist()
+    distance_matrix = cdist(centroids, centroids, metric='euclidean')
+    distance_df = pd.DataFrame(distance_matrix, index=country_gpd_crop['adm_id'], columns=country_gpd_crop['adm_id'])
+    
+    return distance_df
+
 def assign_adm_units_to_ecmwf_grid_cells(ecmwf, adm_units_shapefile):
     """ 
-    Assigns adm_ids to ECMWF grid cells based on the grid cell coordinates and county polygons.   
+    Assign adm_ids to ECMWF grid cells based on the grid cell coordinates and county polygons.   
 
     Parameters:
-    ecmwf (DataFrame): The ECMWF data.
-    adm_units_shapefile (geoDataFrame): A geodataframe containing the polygons of the administrative units.
-        
+        ecmwf (DataFrame): The ECMWF data.
+        adm_units_shapefile (geoDataFrame): A geodataframe containing the polygons of the administrative units.
     Returns:
-    counties_with_ecmwf_data (DataFrame): The counties with ECMWF data.
+        counties_with_ecmwf_data (DataFrame): The counties with ECMWF data.
     """
     # reproject county polygons from geographic to planar coordinates
     shapefile_planar = adm_units_shapefile[["adm_id", "geometry"]].to_crs(epsg=32723)
@@ -407,20 +571,19 @@ def assign_adm_units_to_ecmwf_grid_cells(ecmwf, adm_units_shapefile):
 
 def merge_ecmwf_to_adm_units(ecmwf, adm_level_forecasts):
     """ 
-    Merges the ECMWF data to the administrative unit level.   
+    Merge the ECMWF data to the administrative unit level.   
 
     Parameters:
-    ecmwf (DataFrame): The ECMWF data.
-    adm_level_forecasts (DataFrame): The administrative unit level.
-    init_month (int): The month when the ECWMF forecast was initialized.
-        
+        ecmwf (DataFrame): The ECMWF data.
+        adm_level_forecasts (DataFrame): The administrative unit level.
+        init_month (int): The month when the ECWMF forecast was initialized.  
     Returns:
-    adm_level_forecasts (DataFrame): The administrative unit level with ECMWF data.
+        adm_level_forecasts (DataFrame): The administrative unit level with ECMWF data.
     """
     ecmwf_assigned_to_adm_units = (
         adm_level_forecasts
-        .merge(ecmwf, on=["init_date", "start_date_bin", "location"], how="left")
-        .groupby(["init_date", "start_date_bin", "adm_id"], as_index=False)[["tavg", "tmax", "tmin", "prec"]].mean()
+        .merge(ecmwf, on=["init_date", "number", "start_date_bin", "location"], how="left")
+        .groupby(["init_date", "number", "start_date_bin", "adm_id"], as_index=False)[["tavg", "tmax", "tmin", "prec"]].mean()
         .assign(time_step=lambda df: df["start_date_bin"].apply(lambda x: day_of_year_to_time_step[x.day_of_year]))
     )
         
@@ -429,84 +592,43 @@ def merge_ecmwf_to_adm_units(ecmwf, adm_level_forecasts):
 
 def assign_ecmwf_forecasts_to_adm_units(ecmwf, adm_units_shapefile):
     """ 
-    Assigns ECMWF grid cell forecasts to adm units based on the grid cell coordinates and admin units polygons.   
+    Assign ECMWF grid cell forecasts to adm units based on the grid cell coordinates and admin units polygons.   
 
     Parameters:
-    ecmwf (DataFrame): The ECMWF data.
-    adm_units_shapefile (geoDataFrame): A geodataframe containing the polygons of the administrative units.
-    init_month (int): The month when the ECWMF forecast was initialized.
-        
+        ecmwf (DataFrame): The ECMWF data.
+        adm_units_shapefile (geoDataFrame): A geodataframe containing the polygons of the administrative units.
+        init_month (int): The month when the ECWMF forecast was initialized.
     Returns:
-    counties_with_ecmwf_data (DataFrame): The counties with ECMWF data.
-    first_time_step (int): The first time step of the forecast.
+        counties_with_ecmwf_data (DataFrame): The counties with ECMWF data.
+        first_time_step (int): The first time step of the forecast.
     """
     adm_level_forecasts = create_adm_unit_level_forecast_dataframe(
-        [ecmwf["init_date"].unique(), ecmwf["start_date_bin"].unique(), adm_units_shapefile["adm_id"].unique()], 
-        ["init_date", "start_date_bin", "adm_id"], adm_units_shapefile, ecmwf)
+        [ecmwf["init_date"].unique(), ecmwf["number"].unique(), ecmwf["start_date_bin"].unique(), adm_units_shapefile["adm_id"].unique()], 
+        ["init_date", "number", "start_date_bin", "adm_id"], adm_units_shapefile, ecmwf)
 
     ecmwf_assigned_to_adm_units = merge_ecmwf_to_adm_units(ecmwf, adm_level_forecasts)
-    first_time_step = ecmwf_assigned_to_adm_units["time_step"].min()
     
-    ecmwf_assigned_to_adm_units_pivot = ecmwf_assigned_to_adm_units.pivot(index=["adm_id", "init_date"], columns="time_step", values=["tavg", "tmin", "tmax", "prec"])
-    ecmwf_assigned_to_adm_units_pivot.columns = ["_".join([str(col) for col in c]).strip() for c in ecmwf_assigned_to_adm_units_pivot.columns]
-    ecmwf_assigned_to_adm_units_pivot = ecmwf_assigned_to_adm_units_pivot.reset_index()
-    ecmwf_assigned_to_adm_units_pivot = ecmwf_assigned_to_adm_units_pivot.assign(harvest_year=ecmwf_assigned_to_adm_units_pivot["init_date"].dt.year)
-    
-    return ecmwf_assigned_to_adm_units_pivot, first_time_step
+    return ecmwf_assigned_to_adm_units
 
 
 def normal_correction(obs_data, mod_data, sce_data, cdf_threshold=0.9999999):
-    obs_len, mod_len, sce_len = [len(x) for x in [obs_data, mod_data, sce_data]]
-    obs_mean, mod_mean, sce_mean = [x.mean() for x in [obs_data, mod_data, sce_data]]
+    """
+    Apply quantile mapping to correct the SCM data to match the observed data distribution.
     
-    obs_norm, mod_norm, sce_norm = [
-        norm.fit(x) for x in [obs_data, mod_data, sce_data]
-    ]
-    
-    sce_norm = list(sce_norm)
-    sce_norm[1] += 1e-5
-    sce_norm = tuple(sce_norm)
-    
-    #print(*sce_norm)
-    
+    Parameters:
+        obs_data: np.array or pd.Series, observed reference data
+        mod_data: np.array or pd.Series, model reference data
+        sce_data: np.array or pd.Series, SCM data to be adjusted
+        cdf_threshold: float, threshold for CDF values
+    Returns:
+        sce_adjusted: np.array, adjusted SCM data
+    """
+    obs_norm, mod_norm = [norm.fit(x) for x in [obs_data, mod_data]]
     obs_cdf = norm.cdf(np.sort(obs_data), *obs_norm)
     mod_cdf = norm.cdf(np.sort(mod_data), *mod_norm)
-    sce_cdf = norm.cdf(np.sort(sce_data), *sce_norm)
-
     obs_cdf = np.maximum(np.minimum(obs_cdf, cdf_threshold), 1 - cdf_threshold)
     mod_cdf = np.maximum(np.minimum(mod_cdf, cdf_threshold), 1 - cdf_threshold)
-    sce_cdf = np.maximum(np.minimum(sce_cdf, cdf_threshold), 1 - cdf_threshold)
-
-    sce_argsort = np.argsort(sce_data)
-
-    obs_cdf_intpol = np.interp(
-        np.linspace(1, obs_len, sce_len), np.linspace(1, obs_len, obs_len), obs_cdf
-    )
-    mod_cdf_intpol = np.interp(
-        np.linspace(1, mod_len, sce_len), np.linspace(1, mod_len, mod_len), mod_cdf
-    )
-    obs_cdf_shift, mod_cdf_shift, sce_cdf_shift = [
-        (x - 0.5) for x in [obs_cdf_intpol, mod_cdf_intpol, sce_cdf]
-    ]
-
-    obs_inverse, mod_inverse, sce_inverse = [
-        1.0 / (0.5 - np.abs(x)) for x in [obs_cdf_shift, mod_cdf_shift, sce_cdf_shift]
-    ]
-
-    adapted_cdf = np.sign(obs_cdf_shift) * (
-        1.0 - 1.0 / (obs_inverse * sce_inverse / mod_inverse)
-    )
-    adapted_cdf[adapted_cdf < 0] += 1.0
-    adapted_cdf = np.maximum(np.minimum(adapted_cdf, cdf_threshold), 1 - cdf_threshold)
-
-    xvals = norm.ppf(np.sort(adapted_cdf), *obs_norm) + obs_norm[-1] / mod_norm[-1] * (
-        norm.ppf(sce_cdf, *sce_norm) - norm.ppf(sce_cdf, *mod_norm)
-    )
-
-    xvals -= xvals.mean()
-    xvals += obs_mean + (sce_mean - mod_mean)
-
-    correction = np.zeros(sce_len)
-    correction[sce_argsort] = xvals
-
-    return correction
+    mod_cdf_intpol = np.interp(sce_data, np.sort(mod_data), mod_cdf)
+    sce_adjusted = norm.ppf(mod_cdf_intpol, *obs_norm)
+    
+    return sce_adjusted
