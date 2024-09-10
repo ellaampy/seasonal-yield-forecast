@@ -2,6 +2,7 @@ import torch
 import pandas as pd
 import numpy as np
 import json
+import os
 from torch.utils.data import Dataset
 
 
@@ -30,11 +31,10 @@ class YieldDataset(Dataset):
         Returns:
             - tensor object of features, yield
         """
-
         self.predictors_df = pd.read_csv(predictor_path)
         self.yield_df = pd.read_csv(yield_path)
         self.norm = norm
-
+        print([c for c in self.predictors_df.columns if ("lat" in c) or ("lon" in c)])
         # merge predictors and yield
         self.df = pd.merge(self.yield_df, self.predictors_df, on=['adm_id', 'harvest_year'], how='inner')
 
@@ -50,9 +50,8 @@ class YieldDataset(Dataset):
         # ====================== FEATURE SELECTION START ==============================
         
         combined_features = []
-        seq_feature_prefixes = ["tavg", "prec", 'tmax', 'tmin', "fpar", 
-                                 "ndvi", "ssm", "rsm", "cwb", "et0", "rad"]
-        static_features = ["awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(1,7)]
+        seq_feature_prefixes = ["tavg", "prec", 'tmax', 'tmin', "rad", "et0",  "ssm", "ndvi", "fpar", "cwb"]
+        static_features = ["awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(3,7)] + ['lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
 
         # use all features is no feature selection
         if feature_selector is None:
@@ -73,15 +72,12 @@ class YieldDataset(Dataset):
 
         # reconstruct array as samples x time x channels.
         combined_features = np.stack(combined_features, axis=-1)
-
         # normalize
         norm_data, self.norm_values = self._apply_normalization(combined_features, 
                                                                     self.state_ids, self.norm)
-
         # truncate time series
         self.truncated_data = self._truncate_temporal(norm_data,
                                                       temporal_truncation, proportion)
-
 
     def _apply_filters(self, df, years, state_selector, aez_selector):
 

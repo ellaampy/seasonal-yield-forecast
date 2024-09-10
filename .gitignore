@@ -1,4 +1,5 @@
 data/
+outputs/
 .DS_Store
 
 # Byte-compiled / optimized / DLL files
@@ -80,6 +81,9 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# data files
+
 
 # IPython
 profile_default/
