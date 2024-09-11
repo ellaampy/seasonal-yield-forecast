@@ -29,10 +29,11 @@ class YieldDataset_SCM(Dataset):
             - norm (dict): Dictionary of mean and std of features and timesteps
                            grouped by state
             - scm_path(str): path to csv containing SCM data
-            - scm_folder(str): which simulation data to use. if None, an average
+            - simulation_num(int): which simulation data to use. if None, an average
                                    of all simulations is used
             - init_month(str): initialization month of scm forecast e.g. july
             - scm_bin(int): days of temporal aggregation e.g 8 or 16
+            - bias_adjusted(str): one of "ba", "no_ba" to specify if bias adjusted SCM data should.
             - zero_filled(str): specify how the input observed and augmented data
                                 is merged.
 
@@ -47,12 +48,11 @@ class YieldDataset_SCM(Dataset):
         self.temporal_truncation = temporal_truncation
 
         ## todo 
-        ## 1. add bias adjustment. file name structure has changed
-        ## 2. implement scm truncation
+        ## 1. implement scm truncation
 
 
         # read scm data
-        self.scm_df = pd.read_csv(os.path.join(scm_folder, 'ecmwf_wheat_US_{}_{}daybins.csv'.format(init_month, scm_bin)))
+        self.scm_df = pd.read_csv(os.path.join(scm_folder, 'ecmwf_wheat_US_{}_{}_{}daybins.csv'.format(bias_adjusted, init_month, scm_bin)))
         scm_features = ['tavg', 'tmin', 'tmax', 'prec']
         self.scm_timesteps = sum(self.scm_df.columns.str.startswith(scm_features[0]))
 
@@ -114,7 +114,6 @@ class YieldDataset_SCM(Dataset):
         for feature in feature_selector:
             if feature in seq_feature_prefixes:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]].to_numpy()
-                ## todo ensure that filtered columns are in chronologcal order
 
             elif feature in static_features:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]]
