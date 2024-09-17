@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 from models.utils import *
 from models.lstm import LSTM
+from models.vanillann import MLP
 from data_preparation.dataset import YieldDataset
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -37,11 +38,9 @@ def main(cfg: DictConfig):
         norm = None,
         years= cfg.dataset.train_years,
         feature_selector= cfg.dataset.feature_selector,
-        max_timesteps= cfg.dataset.max_timesteps,
         temporal_truncation= cfg.dataset.temporal_truncation, 
         proportion= cfg.dataset.proportion,
-        state_selector= cfg.dataset.state_selector,
-        aez_selector= cfg.dataset.aez_selector
+        state_selector= cfg.dataset.state_selector
     )
 
     val_dataset = YieldDataset(
@@ -50,11 +49,9 @@ def main(cfg: DictConfig):
         norm = train_dataset.norm_values,
         years= cfg.dataset.val_years,
         feature_selector= cfg.dataset.feature_selector,
-        max_timesteps= cfg.dataset.max_timesteps,
         temporal_truncation= cfg.dataset.temporal_truncation, 
         proportion= cfg.dataset.proportion,
-        state_selector= cfg.dataset.state_selector,
-        aez_selector= cfg.dataset.aez_selector
+        state_selector= cfg.dataset.state_selector
     )
 
     test_dataset = YieldDataset(
@@ -63,11 +60,9 @@ def main(cfg: DictConfig):
         norm = train_dataset.norm_values,
         years= cfg.dataset.test_years,
         feature_selector= cfg.dataset.feature_selector,
-        max_timesteps= cfg.dataset.max_timesteps,
         temporal_truncation= cfg.dataset.temporal_truncation, 
         proportion= cfg.dataset.proportion,
-        state_selector= cfg.dataset.state_selector,
-        aez_selector= cfg.dataset.aez_selector
+        state_selector= cfg.dataset.state_selector
     )
 
     train_loader = torch.utils.data.DataLoader(train_dataset, num_workers=cfg.training.num_workers,  \
@@ -82,10 +77,17 @@ def main(cfg: DictConfig):
     
     print('Train {}, Val {}, Test {}'.format(len(train_loader), len(val_loader), len(test_loader)))
     
-    model =  LSTM(input_dim=cfg.model.input_dim, num_classes=cfg.model.num_classes, 
-                  hidden_dims=cfg.model.hidden_dims,num_layers=cfg.model.num_layers, 
-                  dropout=cfg.model.dropout, bidirectional=cfg.model.bidirectional, 
-                  use_layernorm=cfg.model.use_layernorm)
+
+    model =  LSTM(input_dim=len(cfg.dataset.feature_selector), num_classes=cfg.model.num_classes, 
+                hidden_dims=cfg.model.hidden_dims,num_layers=cfg.model.num_layers, 
+                dropout=cfg.model.dropout, bidirectional=cfg.model.bidirectional, 
+                use_layernorm=cfg.model.use_layernorm)
+    
+
+    # model = MLP(input_dim=len(cfg.dataset.feature_selector), sequence_len =cfg.model.sequence_len, 
+    #             hidden_dim1=cfg.model.hidden_dim1, hidden_dim2 =cfg.model.hidden_dim2, 
+    #             dropout = cfg.model.dropout)
+
     
     model = model.to(cfg.training.device)
 
@@ -174,7 +176,11 @@ def main(cfg: DictConfig):
     writer_train.close()
     writer_val.close()
 
+    print('Best Epoch ==>' , best_epoch)
     print('Best validation loss ==> ', best_loss)
+    print('Best validation NRMSE ==> ', trainlog[best_epoch]['val_nrmse'])
+    print('Best validation R2 ==> ', trainlog[best_epoch]['val_R2'])
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
     main()

@@ -8,10 +8,11 @@ from torch.utils.data import Dataset
 
 class YieldDataset_SCM(Dataset):
     def __init__(self, predictor_path, yield_path, norm=None, years=None, 
-                 feature_selector=None, max_timesteps=46, temporal_truncation=None, 
-                 proportion=100, state_selector=None, aez_selector=None,
+                 feature_selector=None, temporal_truncation=None, 
+                 proportion=100, state_selector=None,
                  scm_folder=None, simulation_num=None, init_month='july',
-                 scm_bin=8, bias_adjusted=True, scm_truncation=None, return_type='zero_filled'):
+                 scm_bin=8, bias_adjusted=True, scm_truncation=None, 
+                 return_type='zero_filled'):
         """
         Initialize the dataset 
 
@@ -20,12 +21,10 @@ class YieldDataset_SCM(Dataset):
             - yield_path (str): Path to the yield DataFrame.
             - norm (dict): Dictionary of mean and std per channel and state
             - year_range (list): A list of (start_year, end_year) to filter data by year.
-            - feature_selector (list): List of features to select from the DataFrame.
-            - max_timesteps (int): maximum number of sequences
+            - feature_selector (list): List of features to select from the DataFrame
             - temporal_truncation (list): start and end index of the time series
             - proportion (int): percentage of time steps to subset
             - state_selector (list): List of states to filter data by.
-            - aez_selector (list): List of AEZs to filter data by.
             - norm (dict): Dictionary of mean and std of features and timesteps
                            grouped by state
             - scm_path(str): path to csv containing SCM data
@@ -90,7 +89,7 @@ class YieldDataset_SCM(Dataset):
         self.df.drop(columns=[f'{col}_new' for col in replace_cols], inplace=True)   
 
         # apply filtering and processing
-        self.df = self._apply_filters(self.df, years, state_selector, aez_selector)
+        self.df = self._apply_filters(self.df, years, state_selector)
    
         # get admin ids and years
         self.ids = self.df['adm_id'].to_numpy()
@@ -104,7 +103,7 @@ class YieldDataset_SCM(Dataset):
         seq_feature_prefixes = ["tavg", "prec", 'tmax', 'tmin', "fpar", 
                                  "ndvi", "ssm", "rsm", "cwb", "et0", "rad"]
         static_features = ["awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(0,7)] + \
-                          ['lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
+                          ['lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3', 'yield_-4', 'yield_-5']
         
 
         # use all features is no feature selection
@@ -114,10 +113,11 @@ class YieldDataset_SCM(Dataset):
         for feature in feature_selector:
             if feature in seq_feature_prefixes:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]].to_numpy()
+                self.max_timesteps = filtered_df.shape[1]
 
             elif feature in static_features:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]]
-                filtered_df = np.repeat(filtered_df.to_numpy(), max_timesteps, axis=1)
+                filtered_df = np.repeat(filtered_df.to_numpy(), self.max_timesteps, axis=1)
             combined_features.append(filtered_df)
 
         # get index for scm variables
@@ -136,7 +136,7 @@ class YieldDataset_SCM(Dataset):
                                                       self.temporal_truncation, 
                                                       proportion)
 
-    def _apply_filters(self, df, years, state_selector, aez_selector):
+    def _apply_filters(self, df, years, state_selector):
 
         # year filtering
         if years is not None:
@@ -226,9 +226,9 @@ class YieldDataset_SCM(Dataset):
 
 # ### =================== TESTING BLOCKS - REMOVE DELETE AFTER USE================
 
-x_df_path = '/app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US_v2.csv'
-y_df_path = "/app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv"
-scm_folder = "/app/dev/Seasonal_Climate/onedrive"
+# x_df_path = '/app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US_v2.csv'
+# y_df_path = "/app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv"
+# scm_folder = "/app/dev/Seasonal_Climate/onedrive"
 
 
 # # Initialize YieldDataset with various parameters
@@ -237,12 +237,10 @@ scm_folder = "/app/dev/Seasonal_Climate/onedrive"
 #     yield_path=y_df_path,
 #     norm = None,
 #     years=list(range(2004, 2018)),
-#     feature_selector=['awc', 'tavg', 'tmin'],
-#     max_timesteps = 46,
+#     feature_selector=['tavg', 'tmin', 'awc'],
 #     temporal_truncation=[3, 24], #[0,10]
 #     proportion=100,
 #     state_selector=['US-08'],
-#     aez_selector=None,
 #     scm_folder=scm_folder, 
 #     simulation_num=None, 
 #     init_month='july',

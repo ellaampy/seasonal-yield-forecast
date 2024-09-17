@@ -8,7 +8,7 @@ defaults:
 
 model:
   name: lstm
-  input_dim: 19
+  input_dim: 22
   hidden_dims: 64
   num_layers: 4
   dropout: 0.6
@@ -17,7 +17,7 @@ model:
 training:
   batch_size: 64
   learning_rate: 0.0001
-  epochs: 100
+  epochs: 60
   optimizer: adam
   seed: 3407
   device: cuda
@@ -27,13 +27,13 @@ training:
 
 
 dataset:
-  predictor_path: /app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv
+  predictor_path: /app/dev/Seasonal_Climate/onedrive/cy_bench_16daybins_wheat_US_v6.csv
   yield_path: /app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv
-  feature_selector: null  # e.g. ['tvag', 'drainage_class']
-  max_timesteps: 46
-  temporal_truncation: null  # e.g. [11, 15] to represent start/end index of time series
+
+  #always make sure temporal feature precedes static to replace maxtimesteps argument
+  feature_selector: ["tavg","prec",'tmax','tmin',"fpar","ndvi","ssm","rsm","cwb","et0","rad","awc","bulk_density",'drainage_class_3', 'drainage_class_4', 'drainage_class_5','drainage_class_6','lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
+  temporal_truncation: null # e.g. [3, 24] to represent start/end index of time series
   proportion: 100
-  state_selector: ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48']  # activate for USA
+  state_selector: ['US-08','US-20','US-31','US-40','US-46','US-48']  # activate for USA
   # state_selector: ['BR41' 'BR42' 'BR43']  # activate for Brazil
-  aez_selector: null
-  results_path: /app/dev/Seasonal_Climate/results/lstm_us
+  results_path: /app/dev/Seasonal_Climate/results/lstm_us_v6

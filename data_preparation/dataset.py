@@ -8,8 +8,8 @@ from torch.utils.data import Dataset
 
 class YieldDataset(Dataset):
     def __init__(self, predictor_path, yield_path, norm=None, years=None, 
-                 feature_selector=None, max_timesteps=46, temporal_truncation=None, 
-                 proportion=100, state_selector=None, aez_selector=None):
+                 feature_selector=None, temporal_truncation=None, 
+                 proportion=100, state_selector=None):
         """
         Initialize the dataset 
 
@@ -19,11 +19,9 @@ class YieldDataset(Dataset):
             - norm (dict): Dictionary of mean and std per channel and state
             - year_range (list): A list of (start_year, end_year) to filter data by year.
             - feature_selector (list): List of features to select from the DataFrame.
-            - max_timesteps (int): maximum number of sequences
             - temporal_truncation (list): start and end index of the time series
             - proportion (int): percentage of time steps to subset
             - state_selector (list): List of states to filter data by.
-            - aez_selector (list): List of AEZs to filter data by.
             - norm (dict): Dictionary of mean and std of features and timesteps
                            grouped by state
 
@@ -39,7 +37,7 @@ class YieldDataset(Dataset):
         self.df = pd.merge(self.yield_df, self.predictors_df, on=['adm_id', 'harvest_year'], how='inner')
 
         # apply filtering and processing
-        self.df = self._apply_filters(self.df, years, state_selector, aez_selector)
+        self.df = self._apply_filters(self.df, years, state_selector)
    
         # get admin ids and years
         self.ids = self.df['adm_id'].to_numpy()
@@ -52,8 +50,9 @@ class YieldDataset(Dataset):
         combined_features = []
         seq_feature_prefixes = ["tavg", "prec", 'tmax', 'tmin', "fpar", 
                                  "ndvi", "ssm", "rsm", "cwb", "et0", "rad"]
-        static_features = ["awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(1,7)]
-
+        static_features = ["awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(0,7)] + \
+                          ['lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3', 'yield_-4', 'yield_-5']
+        
         # use all features is no feature selection
         if feature_selector is None:
             feature_selector = seq_feature_prefixes + static_features
@@ -61,11 +60,11 @@ class YieldDataset(Dataset):
         for feature in feature_selector:
             if feature in seq_feature_prefixes:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]].to_numpy()
-                ## todo ensure that filtered columns are in chronologcal order
+                self.max_timesteps = filtered_df.shape[1]
 
             elif feature in static_features:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]]
-                filtered_df = np.repeat(filtered_df.to_numpy(), max_timesteps, axis=1)
+                filtered_df = np.repeat(filtered_df.to_numpy(), self.max_timesteps, axis=1)
 
             combined_features.append(filtered_df)
         # ====================== FEATURE SELECTION END ==============================
@@ -75,15 +74,13 @@ class YieldDataset(Dataset):
         combined_features = np.stack(combined_features, axis=-1)
 
         # normalize
-        norm_data, self.norm_values = self._apply_normalization(combined_features, 
-                                                                    self.state_ids, self.norm)
+        norm_data, self.norm_values = self._apply_normalization(combined_features, self.state_ids, self.norm)
 
         # truncate time series
-        self.truncated_data = self._truncate_temporal(norm_data,
-                                                      temporal_truncation, proportion)
+        self.truncated_data = self._truncate_temporal(norm_data, temporal_truncation, proportion)
 
 
-    def _apply_filters(self, df, years, state_selector, aez_selector):
+    def _apply_filters(self, df, years, state_selector):
 
         # year filtering
         if years is not None:
@@ -153,9 +150,10 @@ class YieldDataset(Dataset):
 
 
 
-### =================== TESTING BLOCKS - REMOVE DELETE AFTER USE================
 
-# x_df_path = "/app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv"
+# ### =================== TESTING BLOCKS - REMOVE DELETE AFTER USE================
+
+# x_df_path = "/app/dev/Seasonal_Climate/onedrive/cy_bench_16daybins_wheat_US_v6.csv"
 # y_df_path = "/app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv"
 
 
@@ -166,22 +164,17 @@ class YieldDataset(Dataset):
 #     norm = None,
 #     years=list(range(2002, 2018)),
 #     feature_selector=None,
-#     max_timesteps = 46,
-#     temporal_truncation=None, #[0,10]
+#     temporal_truncation=[3, 24], #[0,10]
 #     proportion=100,
-#     state_selector=['US-08'],
-#     aez_selector=None
-# )
+#     state_selector=['US-08']
 
-# # # Print dataset length
-# # print(f"Dataset length: {len(dataset)}")
+# # Print dataset length
+# print(f"Dataset length: {len(dataset)}")
 
-# # # Retrieve and print a sample
-# # for i in range(len(dataset)):
-# #     predictor, yield_data = dataset[i]
-# #     print(f"Sample {i}:")
-# #     print(f"  Predictor: {predictor.shape}")
-# #     print(f"  Yield: {yield_data.shape}")
-# #     break
-# # print(dataset.norm_values)
-# # print(dataset.combined_features.shape, dataset.target.shape)
+# # Retrieve and print a sample
+# for i in range(len(dataset)):
+#     predictor, yield_data = dataset[i]
+#     print(f"Sample {i}:")
+#     print(f"  Predictor: {predictor.shape}")
+#     print(f"  Yield: {yield_data.cpu().shape}")
+#     break

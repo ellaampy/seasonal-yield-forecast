@@ -118,12 +118,12 @@ def evalMetrics(true, predicted):
     """
     returns computes metrics given reference and predicted values
     """
-    mape = np.round(mean_absolute_percentage_error(true, predicted)*100,2)
-    rmse = np.round(np.sqrt(mean_squared_error(true, predicted)), 2)
-    nrmse = np.round(np.sqrt(mean_squared_error(true, predicted)), 2)/np.mean(predicted)
-    r2 = np.round(r2_score(true, predicted), 2)
-    corr = np.round(pearsonr(true, predicted)[0], 2)
+    mape = np.round(mean_absolute_percentage_error(true, predicted),3)
+    mse = np.round(mean_squared_error(true, predicted), 3)
+    nrmse = np.round(np.sqrt(mean_squared_error(true, predicted))/np.mean(predicted), 3)
+    r2 = np.round(r2_score(true, predicted), 3)
+    corr = np.round(pearsonr(true, predicted)[0], 3)
 
-    return mape, rmse, nrmse, r2, corr
+    return mape, mse, nrmse, r2, corr
 
 # ================ HELPER FUNCTIONS METRICS COMPUTATION
