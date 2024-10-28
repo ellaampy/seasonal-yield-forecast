@@ -34,7 +34,7 @@ class YieldDataset(Dataset):
         self.predictors_df = pd.read_csv(predictor_path)
         self.yield_df = pd.read_csv(yield_path)
         self.norm = norm
-        print([c for c in self.predictors_df.columns if ("lat" in c) or ("lon" in c)])
+
         # merge predictors and yield
         self.df = pd.merge(self.yield_df, self.predictors_df, on=['adm_id', 'harvest_year'], how='inner')
 
@@ -50,8 +50,8 @@ class YieldDataset(Dataset):
         # ====================== FEATURE SELECTION START ==============================
         
         combined_features = []
-        seq_feature_prefixes = ["tavg", "prec", 'tmax', 'tmin', "rad", "et0",  "ssm", "ndvi", "fpar", "cwb"]
-        static_features = ["awc", "bulk_density"] +['drainage_class_'+str(i) for i in range(3,7)] + ['lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
+        seq_feature_prefixes = ["tavg", "tmax", "tmin", "prec", "rad", "fpar", "cwb", "rsm"]
+        static_features = ["awc", "bulk_density", "drainage_class_4", "drainage_class_6", "eos", 'lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
 
         # use all features is no feature selection
         if feature_selector is None:
@@ -60,25 +60,29 @@ class YieldDataset(Dataset):
         for feature in feature_selector:
             if feature in seq_feature_prefixes:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]].to_numpy()
+                
+                
                 ## todo ensure that filtered columns are in chronologcal order
 
             elif feature in static_features:
                 filtered_df = self.df[[col for col in self.df.columns if col.startswith(feature)]]
                 filtered_df = np.repeat(filtered_df.to_numpy(), max_timesteps, axis=1)
-
+                
             combined_features.append(filtered_df)
         # ====================== FEATURE SELECTION END ==============================
 
 
         # reconstruct array as samples x time x channels.
         combined_features = np.stack(combined_features, axis=-1)
+        self.combined_features = combined_features
         # normalize
         norm_data, self.norm_values = self._apply_normalization(combined_features, 
                                                                     self.state_ids, self.norm)
+        self.norm_data = norm_data
         # truncate time series
         self.truncated_data = self._truncate_temporal(norm_data,
                                                       temporal_truncation, proportion)
-
+        #print(self.truncated_data.shape)
     def _apply_filters(self, df, years, state_selector, aez_selector):
 
         # year filtering
@@ -181,3 +185,31 @@ class YieldDataset(Dataset):
 # #     break
 # # print(dataset.norm_values)
 # # print(dataset.combined_features.shape, dataset.target.shape)
+
+
+# """ def _apply_normalization(self, data, group_array, norm, max_timesteps):
+
+#         unique_groups = np.unique(group_array)
+#         normalized_data = np.copy(data)
+
+#         norm_values = dict.fromkeys(unique_groups)
+#         for group in unique_groups:
+#             group_indices = np.where(group_array == group)
+#             group_data = data[group_indices]
+
+#             if norm is not None:
+#                 mean = np.array([norm[group][i]["mean"] for i in range(max_timesteps)])
+#                 std = np.array([norm[group][i]["std"] for i in range(max_timesteps)])
+#                 std = std + 1e-8  # to avoid division by zero
+#                 normalized_group_data = (group_data - mean) / std
+#                 #print(np.mean(normalized_group_data[:, 0, 0]))
+#                 #print(np.std(normalized_group_data[:, 0, 0]))
+#                 normalized_data[group_indices] = normalized_group_data
+
+#             else:
+#                 mean = np.mean(group_data, axis=0, keepdims=True)
+#                 std = np.std(group_data, axis=0, keepdims=True)
+#                 std = std + 1e-8
+#                 norm_values[group] = {i: {'mean': mean[0, i], 'std': std[0, i]} for i in range(max_timesteps)}
+#                 normalized_group_data = (group_data - mean) / std
+#                 normalized_data[group_indices] = normalized_group_data """

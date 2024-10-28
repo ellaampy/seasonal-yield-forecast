@@ -10,8 +10,9 @@ temporal_prefixes = ["tavg", "prec", "tmin", "tmax", "ndvi", "fpar", "rad", "et0
 
 day_of_year_to_time_step = {
     1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
-    97: 12, 105: 13, 113: 14, 121: 15, 129: 16, 137: 17, 145: 18, 153: 19, 161: 20, 
-    169: 21, 177: 22, 185: 23, 193: 24, 201: 25, 209: 26, 217: 27, 225: 28, 233: 29, 
+    97: 12, 105: 13, 113: 14, 121: 15, 122:15, 129: 16, 130:16, 137: 17, 138:17, 145: 18, 146:18, 153: 19, 154:19, 161: 20, 162:20, 
+    169: 21, 170:21,  177: 22, 178:22, 185: 23, 186:23, 193: 24, 194:24, 201: 25, 202:25, 209: 26, 210:26,
+    217: 27, 218:27, 225: 28, 226:28, 233: 29, 234:29, 
     241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37,  305: 38, 
     313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 361: 45
 }
@@ -142,7 +143,7 @@ def temporal_aggregation_from8day_to_window(df, feature_prefix_list, window_size
     li = []
     for feature in feature_prefix_list:
         res = df[get_temporal_feature_subset(df, [feature])].rolling(window=window_size, min_periods=1, axis=1).mean()
-        res = res.iloc[:, 1::2] 
+        res = res.iloc[:, 1::window_size] 
         li.append(res) 
    
     df = pd.concat(li, axis=1).reset_index()
@@ -446,6 +447,7 @@ def resample_ecmwf(ecmwf, crop_season_in_doy):
         ecmwf_resampled (DataFrame): The resampled ECMWF data.
     """
     start_doy, end_doy = calculate_start_and_end_doy(ecmwf, crop_season_in_doy)
+    
     li = []
     for year in ecmwf["year"].unique():
         ecmwf_year = ecmwf[(ecmwf["year"] == year) & (ecmwf["valid_time"].dt.year == year)
@@ -483,7 +485,7 @@ def calculate_start_and_end_doy(ecmwf, crop_season_in_days_of_year):
         start_doy (int): Bin start as day of year
         end_doy (int): Bin end as day of year
     """
-    first_doy_available_in_all_years = ecmwf.loc[(ecmwf["year"] == ecmwf["valid_time"].dt.year)].groupby("year")["doy"].min().max()
+    first_doy_available_in_all_years = ecmwf.loc[(ecmwf["year"] == ecmwf["valid_time"].dt.year)].groupby("year")["doy"].min().min()
     start_doy = np.intersect1d(list(range(first_doy_available_in_all_years, ecmwf.doy.unique().max())), list(range(crop_season_in_days_of_year[0], crop_season_in_days_of_year[1]+1, 8))).min()
     end_doy = crop_season_in_days_of_year[1]
     

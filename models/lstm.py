@@ -25,7 +25,11 @@ class LSTM(torch.nn.Module):
         if bidirectional:
             hidden_dims = hidden_dims * 2
 
-        self.linear_class = nn.Linear(hidden_dims * num_layers, num_classes, bias=True)
+        self.linear_class = nn.Sequential(
+            nn.Linear(hidden_dims * num_layers, 32, bias=True),
+            nn.ReLU(),
+            nn.Linear(32, num_classes, bias=True)
+        )
 
 
     def logits(self, x):

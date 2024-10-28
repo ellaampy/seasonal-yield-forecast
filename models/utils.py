@@ -80,7 +80,7 @@ def evaluation(model, criterion, loader, device, mode='val'):
                }
 
     if mode == 'val':
-        return metrics
+        return metrics, y_true, y_pred 
     elif mode == 'test':
         return metrics, y_true, y_pred 
 

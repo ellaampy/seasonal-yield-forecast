@@ -8,10 +8,10 @@ defaults:
 
 model:
   name: lstm
-  input_dim: 19
+  input_dim: 18
   hidden_dims: 64
   num_layers: 4
-  dropout: 0.6
+  dropout: 0.5
 
 
 training:
@@ -20,20 +20,26 @@ training:
   epochs: 100
   optimizer: adam
   seed: 3407
-  device: cuda
+  device: cpu
   num_workers: 4
   display_step: 100
-  patience: 10
+  patience: 20
 
 
 dataset:
-  predictor_path: /app/dev/Seasonal_Climate/onedrive/cy_bench_8daybins_wheat_US.csv
-  yield_path: /app/dev/Seasonal_Climate/cybench/cybench-data/wheat/US/yield_wheat_US.csv
+  predictor_path: C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/preprocessed/US/cy_bench_16daybins_wheat_US_v8.csv
+  yield_path: C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/CY-Bench/US/wheat/yield_wheat_US.csv
   feature_selector: null  # e.g. ['tvag', 'drainage_class']
-  max_timesteps: 46
-  temporal_truncation: null  # e.g. [11, 15] to represent start/end index of time series
+  max_timesteps: 23
+  temporal_truncation: [3, 23]  # e.g. [11, 15] to represent start/end index of time series
   proportion: 100
   state_selector: ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48']  # activate for USA
   # state_selector: ['BR41' 'BR42' 'BR43']  # activate for Brazil
+  init_month: "may"
+  bias_adjustment: "ba" # "ba" for bias adjustment, "no_ba" for no bias adjustment
+  scm_folder: 'C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/preprocessed/US/'
+  simulation_num: null
+  scm_features: ["prec"]
+  scm_bin: 16
   aez_selector: null
-  results_path: /app/dev/Seasonal_Climate/results/lstm_us
+  results_path: C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/results/
