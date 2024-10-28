@@ -11,13 +11,13 @@ ML for crop yield forecasting in Brazil and USA using remote sensing data and ob
 
 For the USA, the Great Plains, inlcuding South Dakota, Nebraska, Colorado, Kansas, Oklahoma and Texas is the heartland of winter wheat production (10). Great plains states are highlighted with a blue border in the figure below. 
 
-![](data_preparation/season_wheat_US.png)
+![](data_preparation/figures/season_wheat_US.png)
 
 ### Annual state-level yield and trend
 
 Yield trend in the great plains from 2002-2022 is neglectable. Annual yield data is not detrended, we train a model to estimate absolute yield instead of yield anomalies.
 
-![](data_preparation/yield_trend_US_wheat.png)
+![](data_preparation/figures/yield_trend_US_wheat.png)
 
 **1.2 BRAZIL**
 
@@ -31,7 +31,7 @@ From Nóia Junior et al. (1) - The occurrence of adverse climatic events between
 
 ### Crop calendar
 
-![](data_preparation/season_wheat_BR.png)
+![](data_preparation/figures/season_wheat_BR.png)
 
 ### Study region
 Around 90% of Brazilian wheat is produced in the three southern states **Paraná, Santa Catarina, and Rio Grande do Sul** (blue edgecolor in figure above) (7). Our analysis will focus on these three states only, given that they also share a similar cropping season with roughly the same planting and harvest dates and season length. Planting occurs 
