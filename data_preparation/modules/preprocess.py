@@ -8,7 +8,7 @@ from scipy.spatial.distance import cdist
 static_features = ["awc", "bulk_density", "drainage_class_1", "drainage_class_2", "drainage_class_3", "drainage_class_4", "drainage_class_5", "drainage_class_6"]
 temporal_prefixes = ["tavg", "prec", "tmin", "tmax", "ndvi", "fpar", "rad", "et0", "cwb", "ssm", "rsm"]
 
-day_of_year_to_time_step = {
+day_of_year_to_time_step_ecmwf = {
     1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
     97: 12, 105: 13, 113: 14, 121: 15, 122:15, 129: 16, 130:16, 137: 17, 138:17, 145: 18, 146:18, 153: 19, 154:19, 161: 20, 162:20, 
     169: 21, 170:21,  177: 22, 178:22, 185: 23, 186:23, 193: 24, 194:24, 201: 25, 202:25, 209: 26, 210:26,
@@ -16,6 +16,15 @@ day_of_year_to_time_step = {
     241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37,  305: 38, 
     313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 361: 45
 }
+
+day_of_year_to_time_step_era = {
+    1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
+    97: 12, 105: 13, 113: 14, 121: 15, 129: 16, 137: 17, 145: 18, 153: 19, 161: 20, 
+    169: 21, 177: 22, 185: 23, 193: 24, 201: 25, 209: 26, 217: 27, 225: 28, 233: 29, 
+    241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37,  305: 38, 
+    313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 361: 45
+}
+
        
 fpar_doy_to_time_step = {
     1: 0,  11: 2,  21: 3,  32: 4,  42: 6,  52: 7,  60: 8,  61: 8,  70: 9,  71: 9,  
@@ -98,7 +107,7 @@ def resample_era(era):
                     .groupby(["adm_id", "year"]).resample("8D", on="date")[["tmin", "tmax", "prec", "tavg"]].mean().reset_index()
                     .rename(columns={"date":"start_date_bin"})
                     )
-    era_resampled = era_resampled.assign(time_step=era_resampled["start_date_bin"].apply(lambda x: day_of_year_to_time_step[x.day_of_year]))
+    era_resampled = era_resampled.assign(time_step=era_resampled["start_date_bin"].apply(lambda x: day_of_year_to_time_step_era[x.day_of_year]))
     
     return era_resampled
 
@@ -305,7 +314,7 @@ def assign_time_steps(predictors, crop, country, crop_season_in_months):
         #doy_list = [c for c in predictors["date"].dt.day_of_year.unique().tolist() if c not in day_of_year_to_time_step.keys()]
         #doy_list.sort()
         #print(doy_list)
-        predictors = predictors.assign(time_step=predictors["date"].dt.day_of_year.map(day_of_year_to_time_step).astype('Int64'))
+        predictors = predictors.assign(time_step=predictors["date"].dt.day_of_year.map(day_of_year_to_time_step_era).astype('Int64'))
     
     if (crop == "wheat") & (country == "US") & (crop_season_in_months[0] >= crop_season_in_months[1]):
         predictors.loc[predictors["date"].dt.month >= 8, "time_step"] = predictors.loc[predictors["date"].dt.month >= 8, "time_step"] - 27
@@ -586,7 +595,7 @@ def merge_ecmwf_to_adm_units(ecmwf, adm_level_forecasts):
         adm_level_forecasts
         .merge(ecmwf, on=["init_date", "number", "start_date_bin", "location"], how="left")
         .groupby(["init_date", "number", "start_date_bin", "adm_id"], as_index=False)[["tavg", "tmax", "tmin", "prec"]].mean()
-        .assign(time_step=lambda df: df["start_date_bin"].apply(lambda x: day_of_year_to_time_step[x.day_of_year]))
+        .assign(time_step=lambda df: df["start_date_bin"].apply(lambda x: day_of_year_to_time_step_ecmwf[x.day_of_year]))
     )
         
     return ecmwf_assigned_to_adm_units
