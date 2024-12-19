@@ -56,6 +56,7 @@ class YieldDataset_SCM(Dataset):
         # filter by simulation number
         if simulation_num is not None:
             self.scm_df = self.scm_df[self.scm_df['number']==simulation_num]
+            self.scm_df = self.scm_df.rename(columns={"year": "harvest_year"})
 
         else:
             # average all simulations by adm_id and year

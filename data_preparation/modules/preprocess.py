@@ -9,12 +9,12 @@ static_features = ["awc", "bulk_density", "drainage_class_1", "drainage_class_2"
 temporal_prefixes = ["tavg", "prec", "tmin", "tmax", "ndvi", "fpar", "rad", "et0", "cwb", "ssm", "rsm"]
 
 day_of_year_to_time_step_ecmwf = {
-    1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 
-    97: 12, 105: 13, 113: 14, 121: 15, 122:15, 129: 16, 130:16, 137: 17, 138:17, 145: 18, 146:18, 153: 19, 154:19, 161: 20, 162:20, 
+    1: 0, 9: 1, 17: 2, 25: 3, 33: 4, 41: 5, 49: 6, 57: 7, 65: 8, 73: 9, 81: 10, 89: 11, 90:11,
+    97: 12, 98:12, 105: 13, 106:13, 113: 14, 114:14, 121: 15, 122:15, 129: 16, 130:16, 137: 17, 138:17, 145: 18, 146:18, 153: 19, 154:19, 161: 20, 162:20, 
     169: 21, 170:21,  177: 22, 178:22, 185: 23, 186:23, 193: 24, 194:24, 201: 25, 202:25, 209: 26, 210:26,
-    217: 27, 218:27, 225: 28, 226:28, 233: 29, 234:29, 
+    217: 27, 218:27, 225: 28, 226:28, 233: 29, 234: 29, 
     241: 30, 249: 31, 257: 32, 265: 33, 273: 34, 281: 35, 289: 36, 297: 37,  305: 38, 
-    313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 361: 45
+    313: 39, 321: 40, 329: 41, 337: 42, 345: 43, 353: 44, 358:45, 359: 45
 }
 
 day_of_year_to_time_step_era = {
@@ -202,7 +202,7 @@ def pivot_ecmwf(ecmwf, adjust_time_step=True):
         offset = 19
     else:
         offset = 0
-    ecmwf = ecmwf.assign(time_step = ecmwf["time_step"] + offset,
+    ecmwf = ecmwf.assign(time_step = (ecmwf["time_step"] + offset).replace(64, 18),
                          init_time_step = ecmwf["time_step"].min() + offset, 
                          year = ecmwf["init_date"].dt.year)
     ecmwf = ecmwf.pivot(index=["adm_id", "number", "init_date", "init_time_step", "year"], 
@@ -456,11 +456,14 @@ def resample_ecmwf(ecmwf, crop_season_in_doy):
         ecmwf_resampled (DataFrame): The resampled ECMWF data.
     """
     start_doy, end_doy = calculate_start_and_end_doy(ecmwf, crop_season_in_doy)
-    
+    doy_filter = ecmwf["doy"].between(start_doy, end_doy+7)
+    if ecmwf["init_date"].dt.month.unique()[0] == 1:
+        start_doy = 357
+        doy_filter = (ecmwf["doy"] >= start_doy) | (ecmwf["doy"] < end_doy+7) 
     li = []
     for year in ecmwf["year"].unique():
-        ecmwf_year = ecmwf[(ecmwf["year"] == year) & (ecmwf["valid_time"].dt.year == year)
-                           & (ecmwf["doy"].between(start_doy, end_doy+7))].reset_index(drop=True)
+        ecmwf_year = ecmwf[(ecmwf["year"] == year) 
+                           & (doy_filter)].reset_index(drop=True)
         ecmwf_year_resampled = (ecmwf_year
                                 .groupby(["init_date", "year", "location", "number"])
                                 .resample("8D", on="valid_time")[["tavg", "tmax", "tmin", "prec"]].mean().reset_index()
@@ -514,7 +517,12 @@ def create_adm_unit_level_forecast_dataframe(list_of_index_values, index_names, 
     """
     multi_index = pd.MultiIndex.from_product(list_of_index_values, names=index_names)
     df = pd.DataFrame(index=multi_index).reset_index()
-    df = df.loc[(df["init_date"].dt.year == df["start_date_bin"].dt.year)].reset_index(drop=True)
+    if df["init_date"].dt.month.unique()[0] == 1:
+        df = df.loc[df["start_date_bin"].between(df["init_date"] - pd.Timedelta(days=8), 
+                                                               df["init_date"]+pd.Timedelta(days=216))].reset_index(drop=True)
+    else: 
+        df = df.loc[(df["init_date"].dt.year == df["start_date_bin"].dt.year)].reset_index(drop=True)
+    
     df = df.merge(adm_units_shapefile[["adm_id", "geometry"]], on="adm_id", how="left").set_index(index_names)
     df = gpd.GeoDataFrame(df[["geometry"]], geometry="geometry").reset_index()
 

@@ -17,9 +17,9 @@ model:
 training:
   batch_size: 64
   learning_rate: 0.0001
-  epochs: 100
+  epochs: 1
   optimizer: adam
-  seed: 3407
+  seed: 3407 # , DONE 6777, 9002, 3407, 4100
   device: cpu
   num_workers: 4
   display_step: 100
@@ -31,15 +31,15 @@ dataset:
   yield_path: C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/CY-Bench/US/wheat/yield_wheat_US.csv
   feature_selector: null  # e.g. ['tvag', 'drainage_class']
   max_timesteps: 23
-  temporal_truncation: [3, 23]  # e.g. [11, 15] to represent start/end index of time series
+  temporal_truncation: [3, 21]  # e.g. [11, 15] to represent start/end index of time series
   proportion: 100
   state_selector: ['US-08', 'US-20', 'US-31', 'US-40', 'US-46', 'US-48']  # activate for USA
-  # state_selector: ['BR41' 'BR42' 'BR43']  # activate for Brazil
+  #state_selector: ['BR41', 'BR42', 'BR43']  # activate for Brazil
   init_month: "may"
   bias_adjustment: "ba" # "ba" for bias adjustment, "no_ba" for no bias adjustment
   scm_folder: 'C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/preprocessed/US/'
   simulation_num: null
-  scm_features: ["prec"]
+  scm_features: ["prec", "tavg", "tmax", "tmin"] 
   scm_bin: 16
   aez_selector: null
-  results_path: C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/results/
+  results_path: C:/Users/Max Zachow/OneDrive - TUM/Dokumente/GitHub/seasonal-yield-forecast/data/results_US/

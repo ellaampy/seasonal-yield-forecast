@@ -33,70 +33,83 @@ def main(cfg: DictConfig):
     torch.manual_seed(cfg.training.seed)
     device = torch.device(cfg.training.device)
 
-
-    # # Initialize YieldDataset with various parameters
+    # Initialize YieldDataset with various parameters
+    # train_dataset = YieldDataset(
+    #      predictor_path= cfg.dataset.predictor_path,
+    #      yield_path= cfg.dataset.yield_path,
+    #      norm = None,
+    #      years= cfg.dataset.train_years,
+    #      feature_selector= cfg.dataset.feature_selector,
+    #      max_timesteps= cfg.dataset.max_timesteps,
+    #      temporal_truncation= cfg.dataset.temporal_truncation, 
+    #      proportion= cfg.dataset.proportion,
+    #      state_selector= cfg.dataset.state_selector,
+    #      aez_selector= cfg.dataset.aez_selector
+    #  )
+    
+    # # # Initialize YieldDataset with various parameters
     # val_dataset = YieldDataset(
-    #     predictor_path= cfg.dataset.predictor_path,
-    #     yield_path= cfg.dataset.yield_path,
-    #     norm = train_dataset.norm_values,
-    #     years= cfg.dataset.val_years,
-    #     feature_selector= cfg.dataset.feature_selector,
-    #     max_timesteps= cfg.dataset.max_timesteps,
-    #     temporal_truncation= cfg.dataset.temporal_truncation, 
-    #     proportion= cfg.dataset.proportion,
-    #     state_selector= cfg.dataset.state_selector,
-    #     aez_selector= cfg.dataset.aez_selector
-    # )
+    #      predictor_path= cfg.dataset.predictor_path,
+    #      yield_path= cfg.dataset.yield_path,
+    #      norm = train_dataset.norm_values,
+    #      years= cfg.dataset.val_years,
+    #      feature_selector= cfg.dataset.feature_selector,
+    #      max_timesteps= cfg.dataset.max_timesteps,
+    #      temporal_truncation= cfg.dataset.temporal_truncation, 
+    #      proportion= cfg.dataset.proportion,
+    #      state_selector= cfg.dataset.state_selector,
+    #      aez_selector= cfg.dataset.aez_selector
+    #  )
     
     # test_dataset = YieldDataset(
-    #     predictor_path= cfg.dataset.predictor_path,
-    #     yield_path= cfg.dataset.yield_path,
-    #     norm = train_dataset.norm_values,
-    #     years= cfg.dataset.test_years,
-    #     feature_selector= cfg.dataset.feature_selector,
-    #     max_timesteps= cfg.dataset.max_timesteps,
-    #     temporal_truncation= cfg.dataset.temporal_truncation, 
-    #     proportion= cfg.dataset.proportion,
-    #     state_selector= cfg.dataset.state_selector,
-    #     aez_selector= cfg.dataset.aez_selector
-    # )
+    #      predictor_path= cfg.dataset.predictor_path,
+    #      yield_path= cfg.dataset.yield_path,
+    #      norm = train_dataset.norm_values,
+    #      years= cfg.dataset.test_years,
+    #      feature_selector= cfg.dataset.feature_selector,
+    #      max_timesteps= cfg.dataset.max_timesteps,
+    #      temporal_truncation= cfg.dataset.temporal_truncation, 
+    #      proportion= cfg.dataset.proportion,
+    #      state_selector= cfg.dataset.state_selector,
+    #      aez_selector= cfg.dataset.aez_selector
+    #  )
     
     # Initialize YieldDataset with various parameters
     train_dataset = YieldDataset_SCM(
-        predictor_path= cfg.dataset.predictor_path,
-        yield_path= cfg.dataset.yield_path,
-        norm = None,
-        years= cfg.dataset.train_years,
-        feature_selector=cfg.dataset.feature_selector,
-        temporal_truncation=cfg.dataset.temporal_truncation, 
-        proportion=100,
-        state_selector=cfg.dataset.state_selector,
-        scm_folder=cfg.dataset.scm_folder,
-        simulation_num=cfg.dataset.simulation_num, 
-        init_month=cfg.dataset.init_month,
-        scm_bin=cfg.dataset.scm_bin, 
-        bias_adjusted=cfg.dataset.bias_adjustment,
-        scm_truncation=None, 
-        scm_features=cfg.dataset.scm_features,
-        return_type='zero_filled')
+       predictor_path= cfg.dataset.predictor_path,
+       yield_path= cfg.dataset.yield_path,
+       norm = None,
+       years= cfg.dataset.train_years,
+       feature_selector=cfg.dataset.feature_selector,
+       temporal_truncation=cfg.dataset.temporal_truncation, 
+       proportion=100,
+       state_selector=cfg.dataset.state_selector,
+       scm_folder=cfg.dataset.scm_folder,
+       simulation_num=cfg.dataset.simulation_num, 
+       init_month=cfg.dataset.init_month,
+       scm_bin=cfg.dataset.scm_bin, 
+       bias_adjusted=cfg.dataset.bias_adjustment,
+       scm_truncation=None, 
+       scm_features=cfg.dataset.scm_features,
+       return_type='zero_filled')
     
     val_dataset = YieldDataset_SCM(
-        predictor_path= cfg.dataset.predictor_path,
-        yield_path= cfg.dataset.yield_path,
-        norm = train_dataset.norm_values,
-        years= cfg.dataset.val_years,
-        feature_selector=cfg.dataset.feature_selector,
-        temporal_truncation=cfg.dataset.temporal_truncation, 
-        proportion=100,
-        state_selector=cfg.dataset.state_selector,
-        scm_folder=cfg.dataset.scm_folder,
-        simulation_num=cfg.dataset.simulation_num, 
-        init_month=cfg.dataset.init_month,
-        scm_bin=cfg.dataset.scm_bin, 
-        bias_adjusted=cfg.dataset.bias_adjustment,
-        scm_truncation=None,
-        scm_features=cfg.dataset.scm_features, 
-        return_type='zero_filled')
+       predictor_path= cfg.dataset.predictor_path,
+       yield_path= cfg.dataset.yield_path,
+       norm = train_dataset.norm_values,
+       years= cfg.dataset.val_years,
+       feature_selector=cfg.dataset.feature_selector,
+       temporal_truncation=cfg.dataset.temporal_truncation, 
+       proportion=100,
+       state_selector=cfg.dataset.state_selector,
+       scm_folder=cfg.dataset.scm_folder,
+       simulation_num=cfg.dataset.simulation_num, 
+       init_month=cfg.dataset.init_month,
+       scm_bin=cfg.dataset.scm_bin, 
+       bias_adjusted=cfg.dataset.bias_adjustment,
+       scm_truncation=None,
+       scm_features=cfg.dataset.scm_features, 
+       return_type='zero_filled')
 
     test_dataset = YieldDataset_SCM(
         predictor_path= cfg.dataset.predictor_path,
@@ -133,10 +146,13 @@ def main(cfg: DictConfig):
                   dropout=cfg.model.dropout, bidirectional=cfg.model.bidirectional, 
                   use_layernorm=cfg.model.use_layernorm)
     experiment_name =  "timesteps_{}_{}_{}_{}_{}".format(cfg.dataset.temporal_truncation[0], 
-                                                             cfg.dataset.temporal_truncation[1],
-                                                             cfg.dataset.init_month,
+                                                            cfg.dataset.temporal_truncation[1],
+                                                            cfg.dataset.init_month,
                                                              cfg.dataset.bias_adjustment,
                                                              "_".join(cfg.dataset.scm_features))
+    #experiment_name =  "timesteps_{}_{}".format(cfg.dataset.temporal_truncation[0], 
+    #                                                         cfg.dataset.temporal_truncation[1])
+    
     print(experiment_name)
     model = model.to(cfg.training.device)
     print(sum(p.numel() for p in model.parameters() if p.requires_grad))
@@ -195,6 +211,7 @@ def main(cfg: DictConfig):
             print('Saving predictions of new best model to csv at epoch {}'.format(best_epoch))
             best_df.to_csv(os.path.join(cfg.dataset.results_path, 'val_y_true_y_pred_{}.csv'.format(experiment_name)))
             # activate to save best model
+            print(model.state_dict().keys())
             torch.save({'best epoch': best_epoch, 'state_dict': model.state_dict(),
                         'optimizer': optimizer.state_dict()},
                         os.path.join(cfg.dataset.results_path, 'model.pth.tar'))
@@ -208,7 +225,7 @@ def main(cfg: DictConfig):
 ## =================== ACTIVATE FOR EVALUATION ON TEST =============
     # load best model
     model.load_state_dict(torch.load(os.path.join(cfg.dataset.results_path, 'model.pth.tar'))['state_dict'])
-
+    print(model.state_dict().keys())
     # # evaluate on test data
     model.eval()
     test_metrics, y_true, y_pred = evaluation(model, criterion, test_loader, device=device, mode='test')

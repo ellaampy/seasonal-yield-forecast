@@ -5,8 +5,6 @@ import json
 import os
 from torch.utils.data import Dataset
 
-
-
 class YieldDataset(Dataset):
     def __init__(self, predictor_path, yield_path, norm=None, years=None, 
                  feature_selector=None, max_timesteps=46, temporal_truncation=None, 
@@ -51,7 +49,9 @@ class YieldDataset(Dataset):
         
         combined_features = []
         seq_feature_prefixes = ["tavg", "tmax", "tmin", "prec", "rad", "fpar", "cwb", "rsm"]
-        static_features = ["awc", "bulk_density", "drainage_class_4", "drainage_class_6", "eos", 'lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
+        static_features = ["drainage_class_{}".format(i) for i in range(3,7)] + ["awc", "bulk_density", "eos", 'lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
+        print(static_features)
+        #static_features = ["awc", "bulk_density", "drainage_class_4", "drainage_class_6", "eos", 'lat', 'lon', 'yield_-1', 'yield_-2', 'yield_-3']
 
         # use all features is no feature selection
         if feature_selector is None:
