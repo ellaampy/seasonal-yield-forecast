@@ -12,7 +12,7 @@ from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, 
 # ====================== TRAIN AND EVAL ITERATOR
 
 def train_epoch(model, optimizer, criterion, data_loader, device, display_step):
-    nrmse_meter = tnt.meter.MSEMeter(root=True)
+    nrmse_meter = tnt.meter.MSEMeter(root=True)  #normalization applied in epoch metric
     loss_meter = tnt.meter.AverageValueMeter()
     y_true = []
     y_pred = []
@@ -39,10 +39,10 @@ def train_epoch(model, optimizer, criterion, data_loader, device, display_step):
         if (i + 1) % display_step == 0:
             print('Step [{}/{}], Loss: {:.4f}, NRMSE : {:.2f}'.format(
                 i + 1, len(data_loader), loss_meter.value()[0], 
-                nrmse_meter.value()/np.mean(y_pred)))
+                nrmse_meter.value()/np.mean(y_true)))
 
     epoch_metrics = {'train_loss': loss_meter.value()[0],
-                     'train_nrmse': nrmse_meter.value()/np.mean((y_pred)),
+                     'train_nrmse': nrmse_meter.value()/np.mean((y_true)),
                      'train_R2': r2_score(np.array(y_true), np.array(y_pred)),
                      'train_r': pearsonr(np.array(y_true), np.array(y_pred))[0]}
 
@@ -54,7 +54,7 @@ def evaluation(model, criterion, loader, device, mode='val'):
     y_true = []
     y_pred = []
 
-    nrmse_meter = tnt.meter.MSEMeter(root=True)
+    nrmse_meter = tnt.meter.MSEMeter(root=True) #normalization applied in epoch metric
     loss_meter = tnt.meter.AverageValueMeter()
 
     for (x, y) in loader:
@@ -73,7 +73,7 @@ def evaluation(model, criterion, loader, device, mode='val'):
         pred = prediction.cpu().numpy()
         y_pred.extend(list(pred))
 
-    metrics = {'{}_nrmse'.format(mode): nrmse_meter.value()/np.mean(y_pred),
+    metrics = {'{}_nrmse'.format(mode): nrmse_meter.value()/np.mean(y_true),
                '{}_loss'.format(mode): loss_meter.value()[0],
                '{}_R2'.format(mode): r2_score(np.array(y_true), np.array(y_pred)), 
                '{}_r'.format(mode): pearsonr(np.array(y_true), np.array(y_pred))[0]
