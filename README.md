@@ -1,5 +1,4 @@
-# seasonal-yield-forecast
-ML for crop yield forecasting in Brazil and USA using remote sensing data and observed/forecasted climate data.
+# Wheat yield forecasts with seasonal climate models and long short-term memory networks
 
 ## Define study region and test years
 
@@ -36,7 +35,24 @@ From Nóia Junior et al. (1) - The occurrence of adverse climatic events between
 ### Study region
 Around 90% of Brazilian wheat is produced in the three southern states **Paraná, Santa Catarina, and Rio Grande do Sul** (blue edgecolor in figure above) (7). Our analysis will focus on these three states only, given that they also share a similar cropping season with roughly the same planting and harvest dates and season length. Planting occurs 
 
-**References**
+
+### Citation
+```
+@article{ZACHOW2025110965,
+title = {Wheat yield forecasts with seasonal climate models and long short-term memory networks},
+journal = {Computers and Electronics in Agriculture},
+volume = {239},
+pages = {110965},
+year = {2025},
+issn = {0168-1699},
+doi = {https://doi.org/10.1016/j.compag.2025.110965},
+url = {https://www.sciencedirect.com/science/article/pii/S0168169925010713},
+author = {Maximilian Zachow and Stella Ofori-Ampofo and Harald Kunstmann and Rıdvan Salih Kuzu and Xiao Xiang Zhu and Senthold Asseng},
+keywords = {Seasonal climate models, Crop yield, Wheat, Agriculture, LSTM}
+}
+
+```
+### References
 
 <span style="font-size:0.7em;">
 
